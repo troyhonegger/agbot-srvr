@@ -1,7 +1,7 @@
 // stops JSLint from complaining
 var $;
 
-var estop = function () {
+function estop() {
     "use strict";
     var estopElement = $('#estop');
     // TODO: JSLint apparently doesn't like constants...
