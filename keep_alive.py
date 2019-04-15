@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+#TODO: update this to use standardized logging
+
 import time
 import sys
 import argparse
@@ -14,11 +16,13 @@ if __name__ == '__main__':
 
 	if args.multivator:
 		import multivator
-		m = multivator.Multivator()
-		m.connect()
+		def inst_multivator():
+			m = multivator.Multivator()
+			m.connect()
+			return m
 	else:
 		# passing a dummy class around, with all the methods replaced with no-ops, is easier,
-		# and arguably more elegant, than putting 'if m is not None' checks everywhere.
+		# and arguably more elegant, than putting 'if not None' checks everywhere.
 		# We do the same thing with DummySpeedController
 		class DummyMultivator:
 			def __init__(self):
@@ -29,12 +33,15 @@ if __name__ == '__main__':
 				pass
 			def keep_alive(self):
 				pass
-		m = DummyMultivator()
-
+		def inst_multivator():
+			return DummyMultivator()
+	m = inst_multivator()
 	if args.speed_controller:
 		import speed_ctrl
-		s = speed_ctrl.SpeedController()
-		s.connect()
+		def inst_speed_controller():
+			s = speed_ctrl.SpeedController()
+			s.connect()
+			return s
 	else:
 		class DummySpeedController:
 			def __init__(self):
@@ -45,15 +52,23 @@ if __name__ == '__main__':
 				pass
 			def keep_alive(self):
 				pass
-		s = DummySpeedController()
-
+		def inst_speed_controller(self):
+			return DummySpeedController()
+	s = inst_speed_controller()
+	
 	def handle_error(m, s, source, ex):
 		sys.stderr.write('%s: %s'%(source, str(ex)))
 		try:
+			if m is not None:
+				m.disconnect()
+			m = inst_multivator()
 			m.estop()
 		except multivator.MultivatorException as ex:
 			sys.stderr.write('Multivator Estop failed: %s\n'%str(ex))
 		try:
+			if s is not None:
+				s.disconnect()
+			s = inst_multivator()
 			s.estop()
 		except speed_ctrl.SpeedControlException as ex:
 			sys.stderr.write('SpeedControl Estop failed: %s\n'%str(ex))
