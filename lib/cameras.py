@@ -56,11 +56,11 @@ def open_cameras(n = -1):
 	
 	cameras = []
 	map = { #TODO: insert serial numbers here
-		"serial_0" : 0
-		"serial_1" : 1
-		"serial_2" : 2
-		"serial_3" : 3
-		"serial_4" : 4
+		"A0C8727F" : 0,
+		"serial_1" : 1,
+		"serial_2" : 2,
+		"serial_3" : 3,
+		"serial_4" : 4,
 		"serial_5" : 5
 	}
 	# Regular expression to parse the shell output, which should look something like "E: ID_SERIAL_SHORT=256DEC57\n"
@@ -76,10 +76,15 @@ def open_cameras(n = -1):
 			raise CameraException("Could not read serial number of /dev/video" + str(port))
 		serial = match.groups()[1]
 		id = map[serial];
-		cameras.append(VideoCamera(cv2.VideoCapture(port), id, serial, port))
+		# TODO: hack here. The cameras that we are using each contain two logical cameras (/dev/video* ports),
+		# and I'm not sure what the second one is supposed to do; only that it doesn't appear to do it. From my
+		# testing, I'm pretty sure that the disfunctional virtual camera is always the second to connect. So
+		# for now we can get around it by checking the cameras by ID and not overwriting them if they have already
+		# been found
+		if len(camera for camera in cameras if camera.id != id) == 0:
+			cameras.append(VideoCamera(cv2.VideoCapture(port), id, serial, port))
 	return sorted(cameras, key=lambda camera: camera.id)
 
-#TODO: main program loop if __name__ == "__main__"
 if __name__ == "__main__":
 	import argparse
 	parser = argparse.ArgumentParser(description = "View live feed from the weed camera(s)")
@@ -94,6 +99,8 @@ if __name__ == "__main__":
 				cameras.remove(cameras[i])
 			else:
 				cv2.imshow(str(cameras[i]), img)
+		if len(cameras) == 0:
+			break
 		if cv2.waitKey(1) & 0xFF == ord('q'):
 			for camera in cameras:
 				camera.release()
