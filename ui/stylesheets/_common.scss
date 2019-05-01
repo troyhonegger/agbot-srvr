@@ -2,6 +2,7 @@ $page_margin: 10%;
 $header_padding: 1%;
 $logo_width_small: 20%;
 $header_side_width_small: (100% - $logo_width_small) / 2 - $header_padding;
+$gold: #C28E0E;
 
 .large-screen-only { font-size: 0px; }
 
@@ -62,7 +63,7 @@ body { margin: 0%; }
     margin: 0px;
     padding: 0px;
     border-radius: 0px;
-    background-color: #C28E0E;
+    background-color: $gold;
     ul {
         align-content: center;
         list-style-type: none;
