@@ -10,7 +10,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(prog = 'keep_alive', description = 'Send KeepAlive messages to the multivator and/or the speed controller')
 	parser.add_argument('-m', '--multivator', action = 'store_true', help = 'Send KeepAlive messages to the multivator')
 	parser.add_argument('-s', '--speed-controller', action = 'store_true', help = 'Send KeepAlive messages to the speed controller')
-	parser.add_argument('-d', '--delay', type = float, default = 1.0, action = 'Set the delay length in between sending messages')
+	parser.add_argument('-d', '--delay', type = float, default = 1.0, help = 'Set the delay length in between sending messages')
 
 	args = parser.parse_args()
 

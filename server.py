@@ -43,8 +43,9 @@ class API(object):
 	#TODO: the records and camera endpoints still need implemented
 
 if __name__ == '__main__':
-	cherrypy.config.update('server.conf')
-	cherrypy.tree.mount(UI(), '/', 'server.conf')
-	cherrypy.tree.mount(API(), '/api', 'api.conf')
+	path = os.path.dirname(os.path.abspath(__file__))
+	cherrypy.config.update(path + '/server.conf')
+	cherrypy.tree.mount(UI(), '/', path + '/server.conf')
+	cherrypy.tree.mount(API(), '/api', path + '/api.conf')
 	cherrypy.engine.start()
 	cherrypy.engine.block()
