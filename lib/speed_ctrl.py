@@ -16,9 +16,11 @@ class SpeedControlException(Exception):
 		return 'MultivatorException(message=%s, cause=%s)'%(repr(self.message), repr(self.cause))
 
 class SpeedController:
-	def __init__(self):
+	def __init__(self, ip = DEFAULT_IP, port = DEFAULT_PORT):
 		"""Initializes a SpeedController instance that, once connected, will be able to connect to the speed controller."""
 		self.socket = None
+		self.ip = ip
+		self.port = port
 	def __enter__(self):
 		"""Equivalent to connect() - implemented to support the with operator"""
 		self.connect()
@@ -52,12 +54,12 @@ class SpeedController:
 		except socket.error as error:
 			raise SpeedControlException('Protocol error when sending message - see cause for details', error)
 	
-	def connect(self, ip = DEFAULT_IP, port = DEFAULT_PORT):
+	def connect(self):
 		"""Connects to the speed controller listening at the specified IP address and port number."""
 		self.disconnect()
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.socket.settimeout(MSG_TIMEOUT)
-		self.socket.connect((ip,port))
+		self.socket.connect((self.ip, self.port))
 	def disconnect(self):
 		if self.socket is not None:
 			self.socket.close()

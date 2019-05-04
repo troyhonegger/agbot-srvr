@@ -10,6 +10,9 @@ import cameras
 import multivator
 import speed_ctrl
 import logging
+import shutil
+import signal
+import loghelper
 
 log = loghelper.get_logger(__file__)
 CURRENT = os.path.join(records.DIR, records.CURRENT + records.EXT)
@@ -29,7 +32,7 @@ def start_processor():
 	global file
 	global mult
 	log.info('Starting processor...')
-	if os.exists(os.path.join(records.DIR, CURRENT))
+	if os.path.exists(os.path.join(records.DIR, CURRENT)):
 		log.error('CURRENT file %s already exists. Throwing exception...', CURRENT)
 		raise ValueError('Processor is already running. If you did not start processor, delete the file %s and try again'%(CURRENT))
 	else:
@@ -41,8 +44,8 @@ def start_processor():
 	log.debug('Loaded neural network and metadata. net = %d, meta.classes = %d', net, meta.classes)
 	cams = cameras.open_cameras('id*')
 	log.debug('Opened cameras - %d found', len(cams))
-	mult = multivator.Multivator()
-	mult.connect(mode = multivator.Mode.processing)
+	mult = multivator.Multivator(initial_mode = multivator.Mode.processing)
+	mult.connect()
 	speed_controller = speed_ctrl.SpeedController()
 	speed_controller.connect()
 	log.debug('Connected to multivator and speed controller.')
@@ -99,7 +102,7 @@ def main():
 			if sigint_received:
 				log.info('Received SIGINT - terminating processor.')
 				break
-	except exception:
+	except Exception as exception:
 		log.exception(exception)
 		raise
 	finally:

@@ -2,8 +2,6 @@
 
 import plants
 import socket
-import threading
-import datetime
 import json
 import time
 import re
@@ -78,9 +76,15 @@ to connect at the same time, so at most 8 instances of this class can be simulta
 All API calls will block until the API responds to the message. If an error occurs, they will raise a MultivatorException.
 """
 class Multivator:
-	def __init__(self):
-		"""Initializes a multivator instance that, once connected, will be able to talk to the multivator."""
+	def __init__(self, ip = DEFAULT_IP, port = DEFAULT_PORT, create_socket = None, initial_mode = None):
+		"""Initializes a multivator instance that, once connected, will be able to talk to the multivator.
+		create_socket is a lambda for dependency injection. If not None, the instance will call it to
+		obtain a TCP socket."""
+		self.ip = ip
+		self.port = port
 		self.socket = None
+		self.create_socket = create_socket if create_socket is not None else lambda self: socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.initial_mode = initial_mode
 	def __enter__(self):
 		"""Equivalent to connect() - implemented to support the with operator"""
 		self.connect()
@@ -114,22 +118,20 @@ class Multivator:
 		except socket.error as error:
 			raise MultivatorException('Protocol error when sending message - see cause for details', error)
 	
-	def connect(self, ip = DEFAULT_IP, port = DEFAULT_PORT, mode = None, injected_socket = None):
+	def connect(self):
 		"""Connects to the multivator listening at the specified IP address and port number.
 		If a mode is specified (one of Mode.diag or Mode.processing), this also sets the multivator's mode"""
 		self.disconnect()
-		if injected_socket is not None:
-			self.socket = injected_socket;
-		else:
-			self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.socket = self.create_socket(self);
 		self.socket.settimeout(MSG_TIMEOUT)
-		self.socket.connect((ip,port))
-		if mode is not None:
-			self.set_mode(mode)
+		self.socket.connect((self.ip,self.port))
+		if self.initial_mode is not None:
+			self.set_mode(self.initial_mode)
 	def disconnect(self):
 		if self.socket is not None:
 			self.socket.close()
 			self.socket = None
+	
 	
 	def set_mode(self, mode):
 		if mode != Mode.processing and mode != Mode.diag:
