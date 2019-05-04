@@ -5,14 +5,14 @@
 import os
 import datetime
 import darknet
-import records
-import cameras
-import multivator
-import speed_ctrl
-import logging
 import shutil
 import signal
-import loghelper
+from lib import records
+from lib import cameras
+from lib import multivator
+from lib import speed_ctrl
+from lib import loghelper
+from netrc import netrc
 
 log = loghelper.get_logger(__file__)
 CURRENT = os.path.join(records.DIR, records.CURRENT + records.EXT)
@@ -56,6 +56,11 @@ def process():
 def stop_processor(sig, frame):
 	log.info('Shutting down processor...')
 	global file
+	global net
+	global meta
+	global cams
+	global mult
+	global speed_controller
 	if file is not None:
 		file.flush()
 		file.close()
@@ -71,26 +76,21 @@ def stop_processor(sig, frame):
 		shutil.copy(CURRENT, path)
 		os.remove(CURRENT)
 	if net != 0:
-		global net
-		global meta
 		log.debug('Resetting neural network %d', net)
 		darknet.reset_rnn(net)
 		net = 0
 		meta = None
 	if len(cams) != 0:
-		global cams
 		log.debug('Releasing all cameras (%d found)', len(cams))
 		for camera in cams:
 			camera.release()
 		cams = []
 	if mult is not None:
 		log.debug('Disconnecting from multivator')
-		global mult
 		mult.disconnect()
 		mult = None
 	if speed_controller is not None:
 		log.debug('Disconnecting from speed controller')
-		global speed_controller
 		speed_controller.disconnect()
 		speed_controller = None
 

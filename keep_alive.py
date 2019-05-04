@@ -3,8 +3,9 @@
 import time
 import argparse
 import loghelper
-import multivator
-import speed_ctrl
+
+from lib import multivator
+from lib import speed_ctrl
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(prog = 'keep_alive', description = 'Send KeepAlive messages to the multivator and/or the speed controller')

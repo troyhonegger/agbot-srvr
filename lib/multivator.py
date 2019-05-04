@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-import plants
 import socket
 import json
 import time

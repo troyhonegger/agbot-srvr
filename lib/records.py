@@ -2,10 +2,11 @@ import os
 import stat
 import sys
 import cv2
-import plants
 import datetime
 import numpy
 import math
+
+from lib import plants
 
 #Records are stored as DIR/yyyymmdd-#.rec
 DIR = '/home/agbot/agbot-srvr/records'
@@ -128,9 +129,9 @@ class Record:
 			if len(self) == 0:
 				raise ValueError('Cannot compute summary of an empty record')
 			avg_latitude = sum(record.latitude for record in self) / len(self) if len(self) != 0 else 0.0
-			longitudes1 = numpy.array(record.longitude for record in self, numpy.float64)
-			longitudes2 = numpy.array(record.longitude if record.longitude < 180.0 else record.longitude - 360.0 \
-									for record in self, numpy.float64)
+			longitudes1 = numpy.array((record.longitude for record in self), numpy.float64)
+			longitudes2 = numpy.array((record.longitude if record.longitude < 180.0 else record.longitude - 360.0 \
+									for record in self), numpy.float64)
 			avg_longitude = numpy.average(longitudes2) \
 							if numpy.std(longitudes2) < numpy.std(longitudes1) \
 							else numpy.average(longitudes1)

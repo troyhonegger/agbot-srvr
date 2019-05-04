@@ -49,7 +49,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-p', '--port', default = '/dev/ttyS0', required = False, help = 'The serial port on which to listen. The default is /dev/ttyS0')
 	args = parser.parse_args()
-	import loghelper
+	from lib import loghelper
 	import os
 	log = loghelper.get_logger(__file__)
 	log.info('Starting up NMEA listener on serial port %s...', args.port)

@@ -4,7 +4,8 @@ import cv2
 import re
 import subprocess
 import fnmatch
-import loghelper
+
+from lib import loghelper
 
 log = loghelper.get_logger(__file__)
 

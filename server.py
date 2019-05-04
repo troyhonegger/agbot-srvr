@@ -3,7 +3,7 @@ import os
 import json
 import cv2
 
-import records
+from lib import records
 
 class UI:
 	pass
