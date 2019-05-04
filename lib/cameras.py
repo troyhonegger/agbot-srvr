@@ -3,6 +3,10 @@
 import cv2
 import re
 import subprocess
+import fnmatch
+import loghelper
+
+log = loghelper.get_logger(__file__)
 
 class VideoCamera:
 	def __init__(self, stream, id = None, serial = None, port = None):
@@ -23,7 +27,7 @@ class VideoCamera:
 	def read(self):
 		return self.stream.read()
 	def __str__(self):
-		return "Camera " + str(id)
+		return "Camera " + str(self.id)
 	def __repr__(self):
 		return "Camera {} ({}) at /dev/video{} - stream={}".format(self.id, self.serial, self.port, repr(self.stream))
 
@@ -31,37 +35,39 @@ class CameraException(Exception):
 	def __init__(self, message = None):
 		self.message = message
 
-def open_cameras(n = -1):
-	""" Opens the first n connected cameras returned by the OS.
-	If n is omitted, all connected cameras will be opened.
-	If any camera is connected but cannot be opened, a CameraException is thrown.
+def open_cameras(*patterns):
+	""" Opens and returns all connected cameras whose ID matches one of the patterns.
+	Examples:
+		open_cameras() # equivalent to open_cameras('*')
+		open_cameras('id0', 'id1')
+		open_cameras('id*')
 	"""
+	if len(patterns) == 0:
+		patterns = ('*',)
+	
 	# read the list of all available cameras from the OS
 	ports = []
 	proc = subprocess.Popen("ls -l /dev/video*", shell = True, stdout = subprocess.PIPE)
 	proc.wait()
 	if proc.stdout is not None:
 		regex = re.compile(r"/dev/video(\d+)")
-		for line in proc.stdout.read().split('\n')[:-1]:
+		for line in proc.stdout.read().split('\n'):
 			match = regex.match(line)
 			if match is not None:
 				groups = match.groups()
 				if groups is not None and len(groups) > 1:
 					ports.append(int(groups[1]))
-	# select the first n such ports (for example, if /dev/video0, /dev/video2, and /dev/video4 were connected and n = 2,
-	# select ports 0 and 2)
 	ports = sorted(ports)
-	if n >= 0:
-		ports = ports[:n]
+	log.debug('Loaded cameras from OS. Found %d', len(ports))
 	
 	cameras = []
 	map = { #TODO: insert serial numbers here
-		"A0C8727F" : 0,
-		"serial_1" : 1,
-		"serial_2" : 2,
-		"serial_3" : 3,
-		"serial_4" : 4,
-		"serial_5" : 5
+		'A0C8727F' : 'id0',
+		'serial_1' : 'id1',
+		'serial_2' : 'id2',
+		'serial_3' : 'id3',
+		'serial_4' : 'id4',
+		'serial_5' : 'id5'
 	}
 	# Regular expression to parse the shell output, which should look something like "E: ID_SERIAL_SHORT=256DEC57\n"
 	regex = re.compile(r"=([A-Fa-f\d]+)")
@@ -69,28 +75,43 @@ def open_cameras(n = -1):
 		# thanks to https://stackoverflow.com/questions/18605701/get-unique-serial-number-of-usb-device-mounted-to-dev-folder for this trick
 		proc = subprocess.Popen("/bin/udevadm info --name=/dev/video{} | grep SERIAL_SHORT".format(port), shell = True, stdout = subprocess.PIPE)
 		if proc.wait() != 0:
-			raise CameraException("Could not find video port /dev/video" + str(port))
+			# either the OS couldn't find camera info, or the info didn't contain SERIAL_SHORT. Either way, skip this camera
+			log.warning('Could not read camera info for %s. Skipping this camera.', port)
+			continue
 		stdout = proc.stdout.read()
 		match = regex.match(proc.stdout.read())
 		if match is None:
-			raise CameraException("Could not read serial number of /dev/video" + str(port))
+			log.warning('Could not parse serial number for %s. Skipping this camera. The line read was \'%s\'', port, stdout)
+			continue
 		serial = match.groups()[1]
-		id = map[serial];
-		# TODO: hack here. The cameras that we are using each contain two logical cameras (/dev/video* ports),
-		# and I'm not sure what the second one is supposed to do; only that it doesn't appear to do it. From my
-		# testing, I'm pretty sure that the disfunctional virtual camera is always the second to connect. So
-		# for now we can get around it by checking the cameras by ID and not overwriting them if they have already
-		# been found
-		if len(camera for camera in cameras if camera.id != id) == 0:
+		if not serial in map.keys:
+			log.warning('Unrecognized serial number %s at %s. Skipping this camera.', serial, port)
+			continue
+		id = map[serial]
+		if len([1 for pattern in patterns if fnmatch.fnmatch(id, pattern)]) == 0:
+			continue # serial number doesn't match any of the patterns - skip it
+		
+		if len([1 for camera in cameras if camera.id != id]) != 0:
+			# TODO: hack here. The ID cameras that we are using each contain two virtual cameras (i.e. /dev/video* ports),
+			# and I'm not sure what the second one is supposed to do; only that whatever it is, it doesn't appear to do it.
+			# From my testing, I'm pretty sure that the disfunctional virtual camera is always the second to connect. So
+			# for now we can get around it by checking the cameras by ID and not overwriting them if they have already
+			# been found
+			log.warning('Duplicate serial number at %s: %s (%s) has already been mapped.', port, serial, id)
+			continue
+		else:
+			log.info('Successfully mapped %s to camera %s', port, id)
 			cameras.append(VideoCamera(cv2.VideoCapture(port), id, serial, port))
 	return sorted(cameras, key=lambda camera: camera.id)
 
 if __name__ == "__main__":
 	import argparse
 	parser = argparse.ArgumentParser(description = "View live feed from the weed camera(s)")
-	parser.add_argument("--num_cameras", "-n", default=-1, type=int, help="The number of cameras to display")
+	parser.add_argument('--filter', '-f', default='*', \
+						help='Specify a filter for which cameras to open - the default is \'*\'', required=False)
 	args = parser.parse_args()
-	cameras = open_cameras(args.num_cameras)
+	log.debug('Starting camera diagnostics program')
+	cameras = open_cameras(args.filter)
 	while True:
 		for i in range(0, len(cameras)):
 			ret, img = cameras[i].read()
