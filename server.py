@@ -46,12 +46,10 @@ class Records:
 			try:
 				record = records.get_summary(recordID)
 				return {
-					'minTimestamp': record.min_timestamp.isoformat(),
-					'maxTimestamp': record.max_timestamp.isoformat(),
-					'minLong': record.min_long,
-					'maxLong': record.max_long,
-					'minLat': record.min_lat,
-					'maxLat': record.max_lat
+					'startTime': record.start_time.isoformat(),
+					'endTime': record.end_time.isoformat(),
+					'longitude': record.longitude,
+					'latitude': record.latitude,
 				}
 			except FileNotFoundError:
 				raise cherrypy.HTTPError(404, 'Not Found - record %s does not exist'%(recordID))

@@ -34,13 +34,6 @@ def get_image(record_id):
 def get_summary(record_id):
 	return read_record(record_id).get_summary()
 
-EARTH_RADIUS = 20_902_464 # feet
-def _to_cartesian(longitude, latitude):
-	theta = math.radians(latitude)
-	phi = math.radians(90 - longitude)
-	xy_radius = math.sin(phi) * EARTH_RADIUS
-	return (xy_radius * math.cos(theta), xy_radius * math.sin(theta), EARTH_RADIUS * math.cos(phi))
-
 def _vec(*components):
 	return numpy.array(components, numpy.float64)
 def _mag(vector):
@@ -51,6 +44,12 @@ def _crossprod(v1, v2):
 	return _vec(v1[1]*v2[2] - v1[2]*v2[1], v1[2]*v2[0] - v1[0]*v2[2], v1[0]*v2[1] - v1[1]*v2[0])
 def _dotprod(v1, v2):
 	return sum([x*y for x,y in zip(v1, v2)])
+EARTH_RADIUS = 20_902_464 # feet
+def _to_cartesian(longitude, latitude):
+	theta = math.radians(latitude)
+	phi = math.radians(90 - longitude)
+	xy_radius = math.sin(phi) * EARTH_RADIUS
+	return _vec([xy_radius * math.cos(theta), xy_radius * math.sin(theta), EARTH_RADIUS * math.cos(phi)])
 def _coordinate_vectors(x0, y0, z0):
 	"""Returns two vectors - one pointing North in three dimensions (relative to the current position)
 	and one pointing East in three dimensions (relative to the current position)"""
@@ -91,10 +90,11 @@ class RecordLine:
 		return '%s %f %f %s'%(self.timestamp.isoformat(), self.longitude, self.latitude, str(self.plants))
 
 class RecordSummary:
-	def __init__(self, min_timestamp, max_timestamp, min_long, max_long, min_lat, max_lat):
-		self.min_timestamp, self.max_timestamp = (min_timestamp, max_timestamp)
-		self.min_long, self.max_long = (min_long, max_long)
-		self.min_lat, self.max_lat = (min_lat, max_lat)
+	def __init__(self, start_time, end_time, latitude, longitude):
+		self.start_time = start_time
+		self.end_time = end_time
+		self.longitude = longitude
+		self.latitude = latitude
 
 class Record:
 	@classmethod
@@ -116,18 +116,26 @@ class Record:
 	def render(self):
 		self.get_summary()
 		img = numpy.full((IMG_HEIGHT, IMG_WIDTH, 3), 255, numpy.uint8)
-		
+		center = _to_cartesian(self.summary.longitude, self.summary.latitude)
+		north_vec, east_vec = _coordinate_vectors(center[0], center[1], center[2])
+		rel_posns = numpy.array(_to_cartesian(record.longitude, record.latitude) - center for record in self)
+		rel_north = numpy.array(_dotprod(north_vec, rel_posn) for rel_posn in rel_posns)
+		rel_east = numpy.array(_dotprod(east_vec, rel_posn) for rel_posn in rel_posns)
 		for record in self:
 			pass #TODO
-	#TODO: I wonder if I'm returning all the right summary info. Do we really need latitude and longitude?
-	#Alternatively, should we also compute a scale for the image (i.e. how many pixels per foot?)
 	def get_summary(self):
 		if self.summary is None:
+			if len(self) == 0:
+				raise ValueError('Cannot compute summary of an empty record')
+			avg_latitude = sum(record.latitude for record in self) / len(self) if len(self) != 0 else 0.0
+			longitudes1 = numpy.array(record.longitude for record in self, numpy.float64)
+			longitudes2 = numpy.array(record.longitude if record.longitude < 180.0 else record.longitude - 360.0 \
+									for record in self, numpy.float64)
+			avg_longitude = numpy.average(longitudes2) \
+							if numpy.std(longitudes2) < numpy.std(longitudes1) \
+							else numpy.average(longitudes1)
 			self.summary = RecordSummary( \
-				min((record.timestamp for record in self)), \
-				max((record.timestamp for record in self)), \
-				min((record.longitude for record in self)), \
-				max((record.longitude for record in self)), \
-				min((record.latitude for record in self)), \
-				max((record.latitude for record in self)))
+				min(record.timestamp for record in self), \
+				max(record.timestamp for record in self), \
+				avg_latitude, avg_longitude)
 		return self.summary
