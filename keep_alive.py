@@ -1,10 +1,10 @@
 #!/usr/bin/python
 
-#TODO: update this to use standardized logging
-
 import time
-import sys
 import argparse
+import loghelper
+import multivator
+import speed_ctrl
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(prog = 'keep_alive', description = 'Send KeepAlive messages to the multivator and/or the speed controller')
@@ -14,12 +14,10 @@ if __name__ == '__main__':
 
 	args = parser.parse_args()
 
+	log = loghelper.get_logger(__file__)
+
 	if args.multivator:
-		import multivator
-		def inst_multivator():
-			m = multivator.Multivator()
-			m.connect()
-			return m
+		m = multivator.Multivator()
 	else:
 		# passing a dummy class around, with all the methods replaced with no-ops, is easier,
 		# and arguably more elegant, than putting 'if not None' checks everywhere.
@@ -27,24 +25,26 @@ if __name__ == '__main__':
 		class DummyMultivator:
 			def __init__(self):
 				pass
+			def isconnected(self):
+				return True
+			def connect(self):
+				pass
 			def disconnect(self):
 				pass
 			def estop(self):
 				pass
 			def keep_alive(self):
 				pass
-		def inst_multivator():
-			return DummyMultivator()
-	m = inst_multivator()
+		m = DummyMultivator()
 	if args.speed_controller:
-		import speed_ctrl
-		def inst_speed_controller():
-			s = speed_ctrl.SpeedController()
-			s.connect()
-			return s
+		s = speed_ctrl.SpeedController()
 	else:
 		class DummySpeedController:
 			def __init__(self):
+				pass
+			def isconnected(self):
+				return True
+			def connect(self):
 				pass
 			def disconect(self):
 				pass
@@ -52,37 +52,40 @@ if __name__ == '__main__':
 				pass
 			def keep_alive(self):
 				pass
-		def inst_speed_controller(self):
-			return DummySpeedController()
-	s = inst_speed_controller()
+		s = DummySpeedController()
 	
-	def handle_error(m, s, source, ex):
-		sys.stderr.write('%s: %s'%(source, str(ex)))
+	def estop():
 		try:
-			if m is not None:
-				m.disconnect()
-			m = inst_multivator()
+			if not m.isconnected():
+				m.connect()
 			m.estop()
+			log.info('Multivator e-stop engaged.')
 		except multivator.MultivatorException as ex:
-			sys.stderr.write('Multivator Estop failed: %s\n'%str(ex))
+			log.critical('Multivator e-stop FAILED - %s', str(ex))
 		try:
-			if s is not None:
-				s.disconnect()
-			s = inst_multivator()
+			if not s.isconnected():
+				s.connect()
 			s.estop()
+			log.info('Speed-control e-stop engaged')
 		except speed_ctrl.SpeedControlException as ex:
-			sys.stderr.write('SpeedControl Estop failed: %s\n'%str(ex))
+			log.critical('Speed-control e-stop FAILED - %s', str(ex))
 
 	try:
 		while True:
 			try:
+				if not m.isconnected():
+					m.connect()
 				m.keep_alive()
 			except multivator.MultivatorException as ex:
-				handle_error(m, s, 'Multivator', ex)
+				log.error('Multivator KeepAlive FAILED. Engaging e-stop...')
+				estop()
 			try:
+				if not s.isconnected():
+					s.connect()
 				s.keep_alive()
 			except speed_ctrl.SpeedControlException as ex:
-				handle_error(m, s, 'SpeedController', ex)
+				log.error('SpeedController KeepAlive FAILED. Engaging e-stop...')
+				estop()
 			time.sleep(args.delay)
 	finally:
 		m.disconnect()

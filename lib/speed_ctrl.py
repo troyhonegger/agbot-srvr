@@ -54,6 +54,8 @@ class SpeedController:
 		except socket.error as error:
 			raise SpeedControlException('Protocol error when sending message - see cause for details', error)
 	
+	def isconnected(self):
+		return self.socket is not None
 	def connect(self):
 		"""Connects to the speed controller listening at the specified IP address and port number."""
 		self.disconnect()
@@ -61,9 +63,12 @@ class SpeedController:
 		self.socket.settimeout(MSG_TIMEOUT)
 		self.socket.connect((self.ip, self.port))
 	def disconnect(self):
-		if self.socket is not None:
+		if self.isconnected():
 			self.socket.close()
 			self.socket = None
+	
+	def __str__(self):
+		return 'SpeedController(ip = %s, port = %d'%(self.ip, self.port)
 	
 	#TODO: implement all the important commands once the API is defined
 	

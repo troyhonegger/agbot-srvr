@@ -118,9 +118,10 @@ class Multivator:
 		except socket.error as error:
 			raise MultivatorException('Protocol error when sending message - see cause for details', error)
 	
+	def isconnected(self):
+		return self.socket is not None
 	def connect(self):
-		"""Connects to the multivator listening at the specified IP address and port number.
-		If a mode is specified (one of Mode.diag or Mode.processing), this also sets the multivator's mode"""
+		"""Connects to the multivator listening at the specified IP address and port number."""
 		self.disconnect()
 		self.socket = self.create_socket(self);
 		self.socket.settimeout(MSG_TIMEOUT)
@@ -128,9 +129,12 @@ class Multivator:
 		if self.initial_mode is not None:
 			self.set_mode(self.initial_mode)
 	def disconnect(self):
-		if self.socket is not None:
+		if self.isconnected():
 			self.socket.close()
 			self.socket = None
+	
+	def __str__(self):
+		return 'Multivator(ip = %s, port = %d)'%(self.ip, self.port)
 	
 	
 	def set_mode(self, mode):
