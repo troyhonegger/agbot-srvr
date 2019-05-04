@@ -13,7 +13,7 @@ class SpeedControlException(Exception):
 	def __str__(self):
 		return str(self.message)
 	def __repr__(self):
-		return 'MultivatorException(message=%s, cause=%s)'%(repr(message), repr(cause))
+		return 'MultivatorException(message=%s, cause=%s)'%(repr(self.message), repr(self.cause))
 
 class SpeedController:
 	def __init__(self):
@@ -75,6 +75,7 @@ if __name__ == '__main__':
 	with SpeedController() as controller:
 		while True:
 			try:
+				line = input()
 				response = controller._send_msg(line.encode('utf-8'))
 				print(response)
 			except SpeedControlException as error:

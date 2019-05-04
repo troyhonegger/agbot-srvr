@@ -82,7 +82,7 @@ class RecordLine:
 		parts = str.split()
 		return RecordLine(datetime.datetime.fromisoformat(parts[0]), float(parts[1]), float(parts[2]), \
 			plants.Plants.deserialize(' '.join(parts[3:])))
-	def __init__(timestamp, longitude, latitude, plants):
+	def __init__(self, timestamp, longitude, latitude, plants):
 		self.timestamp = timestamp
 		self.longitude = longitude
 		self.latitude = latitude

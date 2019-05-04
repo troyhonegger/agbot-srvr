@@ -69,7 +69,7 @@ class MultivatorException(Exception):
 	def __str__(self):
 		return str(self.message)
 	def __repr__(self):
-		return 'MultivatorException(message=%s, cause=%s)'%(repr(message), repr(cause))
+		return 'MultivatorException(message=%s, cause=%s)'%(repr(self.message), repr(self.cause))
 
 """
 Represents a connection to the agBot multivator. Note that this class is NOT thread-safe: to talk to the multivator through
@@ -201,7 +201,7 @@ class Multivator:
 		self._send_msg('KeepAlive', True)
 	
 	def send_process_message(self, plants):
-		"""Sends a list of PlantInfo objects to the multivator. These PlantInfo objects should be ordered by their
+		"""Sends a list of Plants objects to the multivator. These Plants objects should be ordered by their
 		physical position, left to right - the first entry corresponds to the left tiller, the next corresponds to
 		the left row, then the middle row, and so on."""
 		message = 'Process #'
@@ -214,6 +214,7 @@ if __name__ == '__main__':
 	with Multivator() as multivator:
 		while True:
 			try:
+				line = input()
 				response = multivator._send_msg(line.encode('utf-8'))
 				print(response)
 			except MultivatorException as error:

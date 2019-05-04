@@ -6,7 +6,7 @@ import os
 def get_logger(file):
 	logger = logging.getLogger('agbot')
 	if not logger.hasHandlers():
-		logger.addHandler(logging.FileHandler('/var/data/logs/agbot.log')
+		logger.addHandler(logging.FileHandler('/var/data/logs/agbot.log'))
 	if file is not None:
 		child = logging.getLogger('agbot.%s'%(os.path.splitext(file)[0]))
 		child.setEffectiveLevel(logging.DEBUG)
