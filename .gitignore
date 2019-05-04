@@ -1,0 +1,6 @@
+# cached, pre-compiled Python libraries
+__pycache__
+
+# PyDev project directories
+.project
+.pydevproject
