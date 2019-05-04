@@ -5,6 +5,7 @@ import cv2
 import plants
 import datetime
 import numpy
+import math
 
 #Records are stored as DIR/yyyymmdd-#.rec
 DIR = '/home/agbot/agbot-srvr/records'
@@ -32,6 +33,47 @@ def get_image(record_id):
 
 def get_summary(record_id):
 	return read_record(record_id).get_summary()
+
+EARTH_RADIUS = 20_902_464 # feet
+def _to_cartesian(longitude, latitude):
+	theta = math.radians(latitude)
+	phi = math.radians(90 - longitude)
+	xy_radius = math.sin(phi) * EARTH_RADIUS
+	return (xy_radius * math.cos(theta), xy_radius * math.sin(theta), EARTH_RADIUS * math.cos(phi))
+
+def _vec(*components):
+	return numpy.array(components, numpy.float64)
+def _mag(vector):
+	return math.sqrt(sum([x*x for x in vector]))
+def _hat(vector):
+	return vector / _mag(vector)
+def _crossprod(v1, v2):
+	return _vec(v1[1]*v2[2] - v1[2]*v2[1], v1[2]*v2[0] - v1[0]*v2[2], v1[0]*v2[1] - v1[1]*v2[0])
+def _dotprod(v1, v2):
+	return sum([x*y for x,y in zip(v1, v2)])
+def _coordinate_vectors(x0, y0, z0):
+	"""Returns two vectors - one pointing North in three dimensions (relative to the current position)
+	and one pointing East in three dimensions (relative to the current position)"""
+	# The equation of the tangent plane is x0*x + y0*y + z0*z = x0^2 + y0^2 + z0^2
+	#	this can be derived from the fact that every vector on the plane is perpendicular to (x0, y0, z0)
+	# Therefore, the gradient of the plane is (-x0/z0, -y0/z0).
+	# If we traverse in the x- and y-directions along the gradient and compute the change in z, the vector
+	# (dx, dy, dz) will point north.
+	
+	# As we get very close to the equator, the magnitude of the gradient will become infinite. So I'll stick this
+	# in here just in case. But unless we're literally within ~1/4 mile of the equator, it should never run.
+	if abs(z0 - 0) < 1000:
+		north = _vec(0, 0, 1.0)
+	# Otherwise, we can compute the gradient normally
+	else:
+		dx, dy = -x0/z0, -y0/z0
+		# distortions will also start to occur very close to the north pole, where the gradient approaches zero and
+		# "north" becomes less meaningful. Not that it matters, of course, for our purposes
+		north = _hat(_vec(dx * dx + dy * dy, dx, dy))
+	# This is perpendicular to both north and the normal vector, so it must point either east or west. Right-hand
+	# rule experimentation shows this is the way that points east.
+	east = _hat(_crossprod(north, _vec(x0, y0, z0)))
+	return north, east
 
 # RecordLine text format: [ISO Local Time] [latitude] [longitude] [plants]
 class RecordLine:
