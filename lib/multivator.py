@@ -135,7 +135,7 @@ class Multivator:
 	def __str__(self):
 		return 'Multivator(ip = %s, port = %d)'%(self.ip, self.port)
 	
-	
+	# TODO: update this API and add commands as needed after changes to multivator code
 	def set_mode(self, mode):
 		if mode != Mode.processing and mode != Mode.diag:
 			raise MultivatorException('Invalid mode ' + repr(mode))

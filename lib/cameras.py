@@ -62,7 +62,7 @@ def open_cameras(*patterns):
 	log.debug('Loaded cameras from OS. Found %d', len(ports))
 	
 	cameras = []
-	map = { #TODO: insert serial numbers here
+	id_map = { #TODO: insert serial numbers here
 		'A0C8727F' : 'id0',
 		'serial_1' : 'id1',
 		'serial_2' : 'id2',
@@ -85,24 +85,24 @@ def open_cameras(*patterns):
 			log.warning('Could not parse serial number for %s. Skipping this camera. The line read was \'%s\'', port, stdout)
 			continue
 		serial = match.groups()[1]
-		if not serial in map.keys:
+		if not serial in id_map.keys:
 			log.warning('Unrecognized serial number %s at %s. Skipping this camera.', serial, port)
 			continue
-		id = map[serial]
-		if len([1 for pattern in patterns if fnmatch.fnmatch(id, pattern)]) == 0:
+		camera_id = id_map[serial]
+		if len([1 for pattern in patterns if fnmatch.fnmatch(camera_id, pattern)]) == 0:
 			continue # serial number doesn't match any of the patterns - skip it
 		
-		if len([1 for camera in cameras if camera.id != id]) != 0:
+		if len([1 for camera in cameras if camera.id != camera_id]) != 0:
 			# TODO: hack here. The ID cameras that we are using each contain two virtual cameras (i.e. /dev/video* ports),
 			# and I'm not sure what the second one is supposed to do; only that whatever it is, it doesn't appear to do it.
 			# From my testing, I'm pretty sure that the disfunctional virtual camera is always the second to connect. So
 			# for now we can get around it by checking the cameras by ID and not overwriting them if they have already
 			# been found
-			log.warning('Duplicate serial number at %s: %s (%s) has already been mapped.', port, serial, id)
+			log.warning('Duplicate serial number at %s: %s (%s) has already been mapped.', port, serial, camera_id)
 			continue
 		else:
-			log.info('Successfully mapped %s to camera %s', port, id)
-			cameras.append(VideoCamera(cv2.VideoCapture(port), id, serial, port))
+			log.info('Successfully mapped %s to camera %s', port, camera_id)
+			cameras.append(VideoCamera(cv2.VideoCapture(port), camera_id, serial, port))
 	return sorted(cameras, key=lambda camera: camera.id)
 
 if __name__ == "__main__":

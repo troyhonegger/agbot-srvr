@@ -7,11 +7,11 @@ class Plants(enum.IntFlag):
 	Ragweed = 4
 	Corn = 8
 	@classmethod
-	def deserialize(cls, str):
+	def deserialize(cls, string):
 		#the optional prefix 'Plants.' is accepted, but not necessary
 		prefix = cls.__name__ + '.'
 		plant = Plants.NONE
-		for s in str.split('|'):
+		for s in string.split('|'):
 			s = s.strip()
 			if s.startswith(prefix):
 				s = s[len(prefix):]
