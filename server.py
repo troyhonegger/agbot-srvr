@@ -1,9 +1,21 @@
+#!/usr/bin/python
+
 import cherrypy
 import os
-import json
 import cv2
+import subprocess
+import signal
 
+import estop
 from lib import records
+
+def _processor_pid():
+	try:
+		# runs 'pidof processor.py' in a shell and returns the output (a list
+		# of PIDs), or raises a CalledProcessError upon a nonzero exit code.
+		return int(subprocess.check_output(['pidof', 'processor.py']).split()[0])
+	except subprocess.CalledProcessError:
+		return None
 
 class UI:
 	pass
@@ -12,24 +24,28 @@ class MachineState:
 	exposed = True
 	def __init__(self):
 		pass
+	
 	@cherrypy.expose
 	@cherrypy.tools.json_out()
 	def GET(self):
-		#TODO
-		raise cherrypy.HTTPError(501, 'Not Implemented')
-		return {'processing':False}
+		return { 'processing': _processor_pid() is not None }
+	
 	@cherrypy.expose
 	@cherrypy.tools.accept(media = 'application/json')
 	@cherrypy.tools.json_in()
-	def PUT(self, estopped = None, mode = None):
-		#TODO: implement code inside these three 'if' statements
+	def PUT(self):
 		if cherrypy.request.json['estopped']:
-			pass
-		if cherrypy.request.json['processing'] == True:
-			pass
+			estop.estop(kill_processor = True, new_process = True)
+		elif cherrypy.request.json['processing'] == True:
+			if _processor_pid() is None:
+				subprocess.Popen('/home/agbot/agbot-srvr/processor.py')
 		elif cherrypy.request.json['processing'] == False:
-			pass
-		raise cherrypy.HTTPError(501, 'Not Implemented')
+			pid = _processor_pid()
+			if pid is not None:
+				# send a SIGINT to processor.py. This more or less politely asks
+				# processor.py to shut down at its earliest convenience.
+				os.kill(pid, signal.SIGINT)
+
 
 @cherrypy.popargs('recordID')
 class Records:
@@ -58,10 +74,10 @@ class RecordImage:
 	@cherrypy.tools.response_headers(headers = [('Content-Type','image/jpeg')])
 	def GET(self, recordID):
 		try:
-			retval, bytes = cv2.imencode('.jpeg', records.get_image(recordID))
+			retval, img = cv2.imencode('.jpeg', records.get_image(recordID))
 			if not retval:
 				raise cherrypy.HTTPError(500, 'Internal Server Error - could not encode record %s as image'%(recordID))
-			return bytes
+			return img
 		except FileNotFoundError:
 			raise cherrypy.HTTPError(404, 'Not Found - record %s does not exist'%(recordID))
 

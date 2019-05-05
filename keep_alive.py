@@ -2,8 +2,10 @@
 
 import time
 import argparse
-import loghelper
 
+import estop
+
+from lib import loghelper
 from lib import multivator
 from lib import speed_ctrl
 
@@ -55,22 +57,6 @@ if __name__ == '__main__':
 				pass
 		s = DummySpeedController()
 	
-	def estop():
-		try:
-			if not m.isconnected():
-				m.connect()
-			m.estop()
-			log.info('Multivator e-stop engaged.')
-		except multivator.MultivatorException as ex:
-			log.critical('Multivator e-stop FAILED - %s', str(ex))
-		try:
-			if not s.isconnected():
-				s.connect()
-			s.estop()
-			log.info('Speed-control e-stop engaged')
-		except speed_ctrl.SpeedControlException as ex:
-			log.critical('Speed-control e-stop FAILED - %s', str(ex))
-
 	try:
 		while True:
 			try:
@@ -78,15 +64,17 @@ if __name__ == '__main__':
 					m.connect()
 				m.keep_alive()
 			except multivator.MultivatorException as ex:
+				m.disconnect()
 				log.error('Multivator KeepAlive FAILED. Engaging e-stop...')
-				estop()
+				estop.estop(kill_processor = True)
 			try:
 				if not s.isconnected():
 					s.connect()
 				s.keep_alive()
 			except speed_ctrl.SpeedControlException as ex:
+				s.disconnect()
 				log.error('SpeedController KeepAlive FAILED. Engaging e-stop...')
-				estop()
+				estop.estop(kill_processor = True)
 			time.sleep(args.delay)
 	finally:
 		m.disconnect()

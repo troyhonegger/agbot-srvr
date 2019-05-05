@@ -5,6 +5,8 @@ import datetime
 import darknet
 import shutil
 import signal
+import setproctitle
+
 from lib import records
 from lib import cameras
 from lib import multivator
@@ -51,6 +53,8 @@ def start_processor():
 def process():
 	pass #TODO
 
+# TODO: send stop commands to the multivator as well. Everything should be stopped, the clutch should
+# be engaged, and the hitch should be raised.
 def stop_processor():
 	log.info('Shutting down processor...')
 	global file
@@ -103,8 +107,6 @@ def sigint_handler(sig, frame):
 	signal.signal(signal.SIGINT, sigint_handler)
 
 def main():
-	# register SIGINT handler
-	signal.signal(signal.SIGINT, sigint_handler)
 	start_processor()
 	try:
 		while True:
@@ -119,5 +121,10 @@ def main():
 		stop_processor()
 
 if __name__ == '__main__':
+	# Set the process title so we can be found (and signaled) more easily
+	os.environ['SPT_NOENV'] = 'True'
+	setproctitle.setproctitle('processor.py')
+	# register SIGINT handler
+	signal.signal(signal.SIGINT, sigint_handler)
 	main()
 
