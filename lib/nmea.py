@@ -28,7 +28,7 @@ def read_data(type):
 	if _files[type] is None:
 		path = os.path.join(DIR, type + '.txt')
 		if not os.path.exists(path):
-			raise ValueError('Cannot receive NMEA data because the NMEA listener is not set up. Run %s to start it'%(file))
+			raise ValueError('Cannot receive NMEA data because the NMEA listener is not set up. Run %s to start it'%(__file__))
 		_files[type] = open(path, 'r')
 	for line in _files[line]:
 		if len(line) < 2:
@@ -61,7 +61,7 @@ if __name__ == '__main__':
 				try:
 					data = pynmea2.parse(line.strip())
 					type = data.__class__.__name__
-					if type in files.keys:
+					if type in _files.keys:
 						# use os.write() to auto-synchronize things for us. This makes all writes (effectively) atomic
 						os.write(_files[type].fileno(), (str(data) + '\n').encode('utf-8'))
 						# NOTE: if a longer message is followed by a shorter one, this will leave garbage left over after the first line.

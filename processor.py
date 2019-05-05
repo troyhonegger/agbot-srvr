@@ -1,7 +1,5 @@
 #!/usr/bin/python
 
-# TODO: still need NMEA
-
 import os
 import datetime
 import darknet
@@ -12,7 +10,7 @@ from lib import cameras
 from lib import multivator
 from lib import speed_ctrl
 from lib import loghelper
-from netrc import netrc
+from lib import nmea
 
 log = loghelper.get_logger(__file__)
 CURRENT = os.path.join(records.DIR, records.CURRENT + records.EXT)
@@ -53,7 +51,7 @@ def start_processor():
 def process():
 	pass #TODO
 
-def stop_processor(sig, frame):
+def stop_processor():
 	log.info('Shutting down processor...')
 	global file
 	global net
@@ -93,8 +91,20 @@ def stop_processor(sig, frame):
 		log.debug('Disconnecting from speed controller')
 		speed_controller.disconnect()
 		speed_controller = None
+	# close the NMEA data files
+	nmea.close()
+	log.info('Processor successfully shut down - the program will now exit')
+
+def sigint_handler(sig, frame):
+	"""Run whenever the process receives a SIGINT signal (either from a user pressing CTRL+C, or from another process).
+	This handler prevents an immediate shutdown, but it sets a flag that signals the main loop to cleanup and stop the processor"""
+	global sigint_received
+	sigint_received = True
+	signal.signal(signal.SIGINT, sigint_handler)
 
 def main():
+	# register SIGINT handler
+	signal.signal(signal.SIGINT, sigint_handler)
 	start_processor()
 	try:
 		while True:
@@ -108,14 +118,6 @@ def main():
 	finally:
 		stop_processor()
 
-def sigint_handler():
-	"""Run whenever the process receives a SIGINT signal (either from a user pressing CTRL+C, or from another process).
-	This handler prevents an immediate shutdown, but it sets a flag that signals the main loop to cleanup and stop the processor"""
-	global sigint_received
-	sigint_received = True
-	signal.signal(signal.SIGINT, sigint_handler)
-
 if __name__ == '__main__':
-	# register SIGINT handler
-	signal.signal(signal.SIGINT, stop_processor)
 	main()
+
