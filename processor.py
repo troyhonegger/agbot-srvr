@@ -2,7 +2,6 @@
 
 import os
 import datetime
-import darknet
 import shutil
 import signal
 import setproctitle
@@ -13,22 +12,50 @@ from lib import multivator
 from lib import speed_ctrl
 from lib import loghelper
 from lib import nmea
+from lib import darknet_wrapper
+from lib import plants
 
 log = loghelper.get_logger(__file__)
 CURRENT = os.path.join(records.DIR, records.CURRENT + records.EXT)
 
+# Adjust this to taste
+THRESHOLD = 0.5
+
 net = 0
 meta = None
 cams = []
+cams_history = []
 sigint_received = False
 file = None
 mult = None
 speed_controller = None
 
+# TODO: update this as needed to more accurately match our camera layout.
+def map_location(camera_id, x, y):
+	if camera_id == 'id0':
+		return 0
+	elif camera_id == 'id1':
+		return 1
+	elif camera_id == 'id2':
+		return 2
+	elif camera_id == 'id3':
+		return 2
+	elif camera_id == 'id4':
+		return 3
+	elif camera_id == 'id5':
+		return 4
+	else:
+		return None
+
+plants_map = { # TODO: fill this in with the class names
+	'giant_ragweed': plants.Plants.Ragweed
+}
+
 def start_processor():
 	global net
 	global meta
 	global cams
+	global cams_history
 	global file
 	global mult
 	log.info('Starting processor...')
@@ -39,10 +66,11 @@ def start_processor():
 		file = open(CURRENT, 'w')
 		log.debug('Created %s', CURRENT)
 	# TODO: it'd be nice to use argparse to avoid hard-coding .cfg, .weights, and .data file paths, except as defaults
-	meta = darknet.load_meta(b'/home/agbot/Yolo_mark_2/x64/Release/data/obj.data')
-	net = darknet.load_net(b'/home/agbot/Yolo_mark_2/x64/Release/yolo-obj.cfg', b'/home/agbot/Yolo_mark_2/x64/Release/backup/yolo-obj_final.weights', 0)
+	meta = darknet_wrapper.load_meta(b'/home/agbot/Yolo_mark_2/x64/Release/data/obj.data')
+	net = darknet_wrapper.load_net(b'/home/agbot/Yolo_mark_2/x64/Release/yolo-obj.cfg', b'/home/agbot/Yolo_mark_2/x64/Release/backup/yolo-obj_final.weights', 0)
 	log.debug('Loaded neural network and metadata. net = %d, meta.classes = %d', net, meta.classes)
 	cams = cameras.open_cameras('id*')
+	cams_history= [None for cam in cams]
 	log.debug('Opened cameras - %d found', len(cams))
 	mult = multivator.Multivator(initial_mode = multivator.Mode.processing)
 	mult.connect()
@@ -50,11 +78,41 @@ def start_processor():
 	speed_controller.connect()
 	log.debug('Connected to multivator and speed controller.')
 
-def process():
-	pass #TODO
+def process_detector():
+	global net
+	global meta
+	global cams
+	global cams_history
+	global file
+	global mult
+	global speed_controller
+	i = -1
+	results = [plants.Plants.NONE] * 5
+	for camera in cams:
+		i += 1 # increment i here just so we don't forget if we add a continue or something to the loop
+		ret, image = camera.read()
+		if not ret: #ERROR - skip this camera
+			if cams_history[i]:
+				log.error('Could not read image from camera %s', camera.id)
+			cams_history[i] = False
+			continue # skip this camera
+		else:
+			cams_history[i] = True
+		for (cls, confidence, (x, y, w, h)) in darknet_wrapper.detect_cv2(net, meta, image, thresh = THRESHOLD):
+			if cls in plants_map.keys():
+				results[map_location(camera.id, x, y)] |= plants_map[cls]
+	mult.send_process_message(plants)
+	gga = nmea.read_data(nmea.GGA)
+	record = records.RecordLine(datetime.datetime.now(), gga.longitude, gga.latitude, results)
+	print(str(record), file)
+	file.flush()
 
-# TODO: send stop commands to the multivator as well. Everything should be stopped, the clutch should
-# be engaged, and the hitch should be raised.
+def process():
+	# TODO: update this with end-of-row detection and handling
+	process_detector()
+
+# TODO: send stop commands to the multivator as well. Everything should be stopped,
+# the clutch should be engaged, and the hitch should be raised.
 def stop_processor():
 	log.info('Shutting down processor...')
 	global file
@@ -79,7 +137,7 @@ def stop_processor():
 		os.remove(CURRENT)
 	if net != 0:
 		log.debug('Resetting neural network %d', net)
-		darknet.reset_rnn(net)
+		darknet_wrapper.reset_rnn(net)
 		net = 0
 		meta = None
 	if len(cams) != 0:

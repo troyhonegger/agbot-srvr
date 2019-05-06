@@ -76,19 +76,22 @@ def _coordinate_vectors(x0, y0, z0):
 	return north, east
 
 # RecordLine text format: [ISO Local Time] [latitude] [longitude] [plants]
+# [plants] is a comma-delimited list of Plants objects (which are themselves pipe-delimited).
+# Each entry in the list corresponds to a row, and the rows are listed left to right.
 class RecordLine:
 	@classmethod
-	def read(cls, str):
-		parts = str.split()
+	def read(cls, string):
+		parts = string.split()
+		rows = ' '.join(parts[3:]).split(',')
 		return RecordLine(datetime.datetime.fromisoformat(parts[0]), float(parts[1]), float(parts[2]), \
-			plants.Plants.deserialize(' '.join(parts[3:])))
-	def __init__(self, timestamp, longitude, latitude, plants):
+			[plants.Plants.deserialize(row.strip()) for row in rows])
+	def __init__(self, timestamp, longitude, latitude, rows):
 		self.timestamp = timestamp
 		self.longitude = longitude
 		self.latitude = latitude
-		self.plants = plants
+		self.rowdata = rows
 	def __str__(self):
-		return '%s %f %f %s'%(self.timestamp.isoformat(), self.longitude, self.latitude, str(self.plants))
+		return '%s %f %f %s'%(self.timestamp.isoformat(), self.longitude, self.latitude, ', '.join([str(row) for row in self.rows]))
 
 class RecordSummary:
 	def __init__(self, start_time, end_time, latitude, longitude):
@@ -122,6 +125,8 @@ class Record:
 		rel_posns = numpy.array(_to_cartesian(record.longitude, record.latitude) - center for record in self)
 		rel_north = numpy.array(_dotprod(north_vec, rel_posn) for rel_posn in rel_posns)
 		rel_east = numpy.array(_dotprod(east_vec, rel_posn) for rel_posn in rel_posns)
+		# bounds looks like (furthest_east, furthest_north, furthest_west, furthest_south) relative to center
+		bounds = (numpy.min(rel_east), numpy.max(rel_north), numpy.max(rel_east), numpy.min(rel_north))
 		for record in self:
 			pass #TODO
 	def get_summary(self):
