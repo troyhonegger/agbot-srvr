@@ -27,8 +27,9 @@ class Config:
 	tiller_lowered_height = 'TillerLoweredHeight'
 	hitch_raised_height = 'HitchRaisedHeight'
 	hitch_lowered_height = 'HitchLoweredHeight'
+	hitch_accuracy = 'HitchAccuracy'
 	all_settings = ( precision, keep_alive_timeout, response_delay, tiller_accuracy, tiller_raise_time, \
-		tiller_lower_time, tiller_raised_height, tiller_lowered_height, hitch_raised_height, hitch_lowered_height )
+		tiller_lower_time, tiller_raised_height, tiller_lowered_height, hitch_raised_height, hitch_lowered_height, hitch_accuracy )
 
 class Tiller:
 	def __init__(self, id, target_height, actual_height = None, dh = None, until = None):
@@ -96,6 +97,7 @@ class Multivator:
 		try:
 			if self.socket is None:
 				raise MultivatorException('Not connected')
+			if isinstance(msg, str): msg = msg.encode('utf-8')
 			msg = msg + b'\n'
 			total_sent = 0
 			msg_len = len(msg)
@@ -104,7 +106,7 @@ class Multivator:
 				if sent == 0:
 					raise MultivatorException('Server closed connection unexpectedly - could not send message')
 				total_sent += sent
-			response = ''
+			response = b''
 			while not response.endswith(b'\n'):
 				data = self.socket.recv(MAX_MESSAGE_SIZE)
 				if len(data) == 0:
@@ -113,7 +115,7 @@ class Multivator:
 			response = response.strip()
 			if assert_empty and len(response) != 0:
 				raise MultivatorException(response)
-			return response
+			return response.decode('latin-1')
 		except socket.error as error:
 			raise MultivatorException('Protocol error when sending message - see cause for details', error)
 	
@@ -139,17 +141,17 @@ class Multivator:
 	def set_mode(self, mode):
 		if mode != Mode.processing and mode != Mode.diag:
 			raise MultivatorException('Invalid mode ' + repr(mode))
-		self._send_msg(b'SetMode %s'%(mode), True)
+		self._send_msg('SetMode %s'%(mode), True)
 	def get_mode(self):
-		response = self._send_msg(b'GetState Mode')
-		if response in Mode.all_modes:
+		response = self._send_msg('GetState Mode')
+		if response in Mode.all_modes or response == 'Unset':
 			return response
 		else:
 			raise MultivatorException(response)
 	
 	def get_tiller(self, tiller_id):
 		try:
-			response = self._send_msg(b'GetState Tiller[%d]'%(tiller_id)).strip()
+			response = self._send_msg('GetState Tiller[%d]'%(tiller_id)).strip()
 			json_data = json.loads(response)
 			until = json_data['until'] if 'until' in json_data.keys() else None
 			return Tiller(tiller_id, json_data['target'], json_data['height'], json_data['dh'], until)
@@ -171,7 +173,7 @@ class Multivator:
 			raise MultivatorException(response)
 	def get_hitch(self):
 		try:
-			response = self._send_msg(b'GetState Hitch')
+			response = self._send_msg('GetState Hitch')
 			json_data = json.loads(response)
 			until = json_data['until'] if 'until' in json_data.keys() else None
 			return Hitch(json_data['target'], json_data['height'], json_data['dh'], until)
@@ -184,18 +186,18 @@ class Multivator:
 			raise MultivatorException('Could not parse response: %s'%(response))
 	
 	def get_configuration(self, setting):
-		response = self._send_msg(b'GetState Configuration[%s]\n'%(setting))
+		response = self._send_msg('GetState Configuration[%s]'%(setting))
 		try:
 			return int(response)
 		except ValueError:
 			raise MultivatorException(response)
 	def set_configuration(self, setting, value):
-		self._send_msg(b'SetConfig %s=%s\n'%(setting, str(value)), True)
+		self._send_msg('SetConfig %s=%s'%(setting, str(value)), True)
 	
 	def diag_set_sprayer(self, sprayer):
-		self._send_msg('DiagSet Sprayer[%d]=%s'%(sprayer.id, 'ON' if sprayer.is_on else 'OFF'), True)
+		self._send_msg('DiagSet Sprayer[%x]=%s'%(1 << sprayer.id, 'ON' if sprayer.is_on else 'OFF'), True)
 	def diag_set_tiller(self, tiller):
-		self._send_msg('DiagSet Tiller[%d]=%s'%(tiller.id, str(tiller.target_height)), True)
+		self._send_msg('DiagSet Tiller[%x]=%s'%(1 << tiller.id, str(tiller.target_height)), True)
 	def diag_set_hitch(self, hitch):
 		self._send_msg('DiagSet Hitch=%s'%(str(hitch.target_height)), True)
 	
@@ -210,8 +212,8 @@ class Multivator:
 		physical position, left to right - the first entry corresponds to the left tiller, the next corresponds to
 		the left row, then the middle row, and so on."""
 		message = 'Process #'
-		for plant in plants:
-			message += hex(plant.plants)[2:]
+		for entry in plants:
+			message += hex(entry)[2:]
 		self._send_msg(message, True)
 
 if __name__ == '__main__':
@@ -223,6 +225,6 @@ if __name__ == '__main__':
 				response = multivator._send_msg(line.encode('utf-8'))
 				print(response)
 			except MultivatorException as error:
-				sys.stderr.write(error.message + '\n')
+				sys.stderr.write(error.message)
 			except EOFError:
 				break
