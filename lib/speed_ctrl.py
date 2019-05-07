@@ -33,6 +33,7 @@ class SpeedController:
 		try:
 			if self.socket is None:
 				raise SpeedControlException('Not connected')
+			if isinstance(msg, str): msg = msg.encode('utf-8')
 			msg = msg + b'\n'
 			total_sent = 0
 			msg_len = len(msg)
@@ -41,7 +42,7 @@ class SpeedController:
 				if sent == 0:
 					raise SpeedControlException('Server closed connection unexpectedly - could not send message')
 				total_sent += sent
-			response = ''
+			response = b''
 			while not response.endswith(b'\n'):
 				data = self.socket.recv(MAX_MESSAGE_SIZE)
 				if len(data) == 0:
@@ -50,7 +51,7 @@ class SpeedController:
 			response = response.strip()
 			if assert_empty and len(response) != 0:
 				raise SpeedControlException(response)
-			return response
+			return response.decode('latin-1')
 		except socket.error as error:
 			raise SpeedControlException('Protocol error when sending message - see cause for details', error)
 	
@@ -73,9 +74,13 @@ class SpeedController:
 	#TODO: implement all the important commands once the API is defined
 	
 	def keep_alive(self):
-		self._send_msg(b'KeepAlive', True)
+		self._send_msg('KeepAlive', True)
 	def estop(self):
-		self._send_msg(b'Estop', True)
+		self._send_msg('Estop', True)
+	def start(self):
+		self._send_msg('Start', True)
+	def stop(self):
+		self._send_msg('Stop', True)
 
 if __name__ == '__main__':
 	import sys
@@ -83,7 +88,7 @@ if __name__ == '__main__':
 		while True:
 			try:
 				line = input()
-				response = controller._send_msg(line.encode('utf-8'))
+				response = controller._send_msg(line)
 				print(response)
 			except SpeedControlException as error:
 				sys.stderr.write(error.message)
