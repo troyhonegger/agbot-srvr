@@ -62,13 +62,14 @@ def open_cameras(*patterns):
 	log.debug('Loaded cameras from OS. Found %d', len(ports))
 	
 	cameras = []
-	id_map = { #TODO: insert serial numbers here
-		'A0C8727F' : 'id0',
-		'serial_1' : 'id1',
-		'serial_2' : 'id2',
-		'serial_3' : 'id3',
-		'serial_4' : 'id4',
-		'serial_5' : 'id5'
+	id_map = {
+		#'A0C8727F' : 'id0',
+                '0F57525F' : 'id0',
+		'E517325F' : 'id1',
+		'33D0525F' : 'id2',
+		'FEB7325F' : 'id3',
+		'C622525F' : 'id4',
+		'54A8727F' : 'id5'
 	}
 	# Regular expression to parse the shell output, which should look something like "E: ID_SERIAL_SHORT=256DEC57\n"
 	regex = re.compile(r"=([A-Fa-f\d]+)")
