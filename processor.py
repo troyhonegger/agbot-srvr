@@ -47,8 +47,12 @@ def map_location(camera_id, x, y):
 	else:
 		return None
 
-plants_map = { # TODO: fill this in with the class names
-	'giant_ragweed': plants.Plants.Ragweed
+plants_map = {
+        'foxtail': plants.Plants.Foxtail,
+        'cocklebur': plants.Plants.Cocklebur,
+	'giant_ragweed': plants.Plants.Ragweed,
+        'nitro_def_corn': plants.Plants.Corn,
+        'corn': plants.Plants.NONE # ignore non-nitrogen deficient corn
 }
 
 def start_processor():
