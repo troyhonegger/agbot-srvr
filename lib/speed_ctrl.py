@@ -71,8 +71,6 @@ class SpeedController:
 	def __str__(self):
 		return 'SpeedController(ip = %s, port = %d'%(self.ip, self.port)
 	
-	#TODO: implement all the important commands once the API is defined
-	
 	def keep_alive(self):
 		self._send_msg('KeepAlive', True)
 	def estop(self):

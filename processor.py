@@ -76,6 +76,7 @@ def start_processor():
 	mult.connect()
 	speed_controller = speed_ctrl.SpeedController()
 	speed_controller.connect()
+	speed_controller.start()
 	log.debug('Connected to multivator and speed controller.')
 
 def process_detector():
@@ -111,8 +112,6 @@ def process():
 	# TODO: update this with end-of-row detection and handling
 	process_detector()
 
-# TODO: send stop commands to the multivator as well. Everything should be stopped,
-# the clutch should be engaged, and the hitch should be raised.
 def stop_processor():
 	log.info('Shutting down processor...')
 	global file
@@ -147,10 +146,14 @@ def stop_processor():
 		cams = []
 	if mult is not None:
 		log.debug('Disconnecting from multivator')
+		# switching to diag is probably very bad practice, but it's the quickest way to really stop everything
+		mult.set_mode(multivator.Mode.diag)
+		mult.diag_set_hitch(multivator.Hitch(mult.get_configuration(multivator.Config.hitch_raised_height)))
 		mult.disconnect()
 		mult = None
 	if speed_controller is not None:
 		log.debug('Disconnecting from speed controller')
+		speed_controller.stop();
 		speed_controller.disconnect()
 		speed_controller = None
 	# close the NMEA data files
