@@ -13,9 +13,8 @@ DIR = '/home/agbot/agbot-srvr/records'
 EXT = '.rec'
 CURRENT = 'CURRENT'
 
-IMG_WIDTH = 512
-IMG_HEIGHT = 512
-IMG_BORDER = 20
+MAX_IMG_WIDTH = 1500
+MAX_IMG_HEIGHT = 700
 
 #returns tuple of (recordID, name)
 def get_records():
@@ -119,16 +118,30 @@ class Record:
 		file.flush()
 	def render(self):
 		self.get_summary()
-		img = numpy.full((IMG_HEIGHT, IMG_WIDTH, 3), 255, numpy.uint8)
 		center = _to_cartesian(self.summary.longitude, self.summary.latitude)
 		north_vec, east_vec = _coordinate_vectors(center[0], center[1], center[2])
 		rel_posns = numpy.array(_to_cartesian(record.longitude, record.latitude) - center for record in self)
 		rel_north = numpy.array(_dotprod(north_vec, rel_posn) for rel_posn in rel_posns)
 		rel_east = numpy.array(_dotprod(east_vec, rel_posn) for rel_posn in rel_posns)
-		# bounds looks like (furthest_east, furthest_north, furthest_west, furthest_south) relative to center
-		bounds = (numpy.min(rel_east), numpy.max(rel_north), numpy.max(rel_east), numpy.min(rel_north))
+		furthest_east = numpy.max(rel_east)
+		furthest_north = numpy.max(rel_north)
+		furthest_west = numpy.min(rel_east)
+		furthest_south = numpy.min(rel_north)
+		width_ft, height_ft = furthest_east - furthest_west, furthest_north - furthest_south
+		# compute scale (in pixels per foot)
+		if width_ft == 0 and height_ft == 0:
+			scale = 0 # TODO
+			raise NotImplementedError()
+		elif width_ft == 0:
+			scale = MAX_IMG_HEIGHT / height_ft
+		elif height_ft == 0:
+			scale = MAX_IMG_WIDTH / width_ft
+		else:
+			scale = min(MAX_IMG_WIDTH / width_ft, MAX_IMG_HEIGHT / height_ft)
+		width_px, height_px = math.floor(width_ft * scale), math.floor(height_ft * scale)
+		img = numpy.full((height_px, width_px, 3), 255, numpy.uint8)
 		for record in self:
-			pass #TODO
+			pass # TODO
 	def get_summary(self):
 		if self.summary is None:
 			if len(self) == 0:
