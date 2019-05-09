@@ -22,9 +22,9 @@ class VideoCamera:
 		self.port = port
 		self.id = id
 	def release(self):
-		if self.video_capture is not None:
-			self.video_capture.release()
-			self.video_capture = None
+		if self.stream is not None:
+			self.stream.release()
+			self.stream = None
 	def read(self):
 		return self.stream.read()
 	def __str__(self):
@@ -51,20 +51,20 @@ def open_cameras(*patterns):
 	proc = subprocess.Popen("ls -l /dev/video*", shell = True, stdout = subprocess.PIPE)
 	proc.wait()
 	if proc.stdout is not None:
-		regex = re.compile(r"/dev/video(\d+)")
-		for line in proc.stdout.read().split('\n'):
-			match = regex.match(line)
+		regex = re.compile(r'.*\/dev\/video(\d+).*')
+		for line in proc.stdout.read().split(b'\n'):
+			match = regex.match(line.decode('latin-1'))
 			if match is not None:
 				groups = match.groups()
-				if groups is not None and len(groups) > 1:
-					ports.append(int(groups[1]))
+				if groups is not None and len(groups) > 0:
+					ports.append(int(groups[0]))
 	ports = sorted(ports)
 	log.debug('Loaded cameras from OS. Found %d', len(ports))
 	
 	cameras = []
 	id_map = {
 		#'A0C8727F' : 'id0',
-                '0F57525F' : 'id0',
+        '0F57525F' : 'id0',
 		'E517325F' : 'id1',
 		'33D0525F' : 'id2',
 		'FEB7325F' : 'id3',
@@ -72,7 +72,7 @@ def open_cameras(*patterns):
 		'54A8727F' : 'id5'
 	}
 	# Regular expression to parse the shell output, which should look something like "E: ID_SERIAL_SHORT=256DEC57\n"
-	regex = re.compile(r"=([A-Fa-f\d]+)")
+	regex = re.compile(r"[^=]*=([A-Fa-f\d]+)[^A-Fa-f\d]*")
 	for port in ports:
 		# thanks to https://stackoverflow.com/questions/18605701/get-unique-serial-number-of-usb-device-mounted-to-dev-folder for this trick
 		proc = subprocess.Popen("/bin/udevadm info --name=/dev/video{} | grep SERIAL_SHORT".format(port), shell = True, stdout = subprocess.PIPE)
@@ -80,29 +80,29 @@ def open_cameras(*patterns):
 			# either the OS couldn't find camera info, or the info didn't contain SERIAL_SHORT. Either way, skip this camera
 			log.warning('Could not read camera info for %s. Skipping this camera.', port)
 			continue
-		stdout = proc.stdout.read()
-		match = regex.match(proc.stdout.read())
+		stdout = proc.stdout.read().decode('latin-1')
+		match = regex.match(stdout)
 		if match is None:
-			log.warning('Could not parse serial number for %s. Skipping this camera. The line read was \'%s\'', port, stdout)
+			log.warning('Could not parse serial number for /dev/video%s. Skipping this camera. The line read was \'%s\'', port, stdout)
 			continue
-		serial = match.groups()[1]
-		if not serial in id_map.keys:
-			log.warning('Unrecognized serial number %s at %s. Skipping this camera.', serial, port)
+		serial = match.groups()[0]
+		if not serial in id_map.keys():
+			log.warning('Unrecognized serial number %s at /dev/video%s. Skipping this camera.', serial, port)
 			continue
 		camera_id = id_map[serial]
 		if len([1 for pattern in patterns if fnmatch.fnmatch(camera_id, pattern)]) == 0:
 			continue # serial number doesn't match any of the patterns - skip it
 		
-		if len([1 for camera in cameras if camera.id != camera_id]) != 0:
+		if len([1 for camera in cameras if camera.id == camera_id]) != 0:
 			# TODO: hack here. The ID cameras that we are using each contain two virtual cameras (i.e. /dev/video* ports),
 			# and I'm not sure what the second one is supposed to do; only that whatever it is, it doesn't appear to do it.
 			# From my testing, I'm pretty sure that the disfunctional virtual camera is always the second to connect. So
 			# for now we can get around it by checking the cameras by ID and not overwriting them if they have already
 			# been found
-			log.warning('Duplicate serial number at %s: %s (%s) has already been mapped.', port, serial, camera_id)
+			log.warning('Duplicate serial number at /dev/video%s: %s (%s) has already been mapped.', port, serial, camera_id)
 			continue
 		else:
-			log.info('Successfully mapped %s to camera %s', port, camera_id)
+			log.info('Successfully mapped /dev/video%s to camera %s', port, camera_id)
 			cameras.append(VideoCamera(cv2.VideoCapture(port), camera_id, serial, port))
 	return sorted(cameras, key=lambda camera: camera.id)
 

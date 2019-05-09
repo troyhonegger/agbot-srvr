@@ -13,7 +13,6 @@ def get_logger(file):
 		logger.addHandler(handler)
 	if file is not None:
 		name = os.path.splitext(os.path.relpath(file))[0]
-		print(name)
 		child = logging.getLogger('agbot.%s'%(name))
 		child.setLevel(logging.DEBUG)
 		return child
