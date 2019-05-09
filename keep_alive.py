@@ -49,7 +49,7 @@ if __name__ == '__main__':
 				return True
 			def connect(self):
 				pass
-			def disconect(self):
+			def disconnect(self):
 				pass
 			def estop(self):
 				pass
