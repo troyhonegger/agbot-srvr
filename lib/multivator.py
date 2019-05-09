@@ -129,7 +129,7 @@ class Multivator:
 			self.socket.settimeout(MSG_TIMEOUT)
 			self.socket.connect((self.ip,self.port))
 		except OSError as ex:
-			raise MultivatorException('Could not connect to multivator - %s'%(str(ex)), ex)
+			raise MultivatorException('Could not connect to multivator: %s'%(str(ex)), ex)
 		if self.initial_mode is not None:
 			self.set_mode(self.initial_mode)
 	def disconnect(self):
