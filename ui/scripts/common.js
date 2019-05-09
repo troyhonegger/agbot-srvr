@@ -1,5 +1,3 @@
-// stops JSLint from complaining
-var $;
 
 function estop() {
     "use strict";
@@ -7,18 +5,25 @@ function estop() {
     // TODO: JSLint apparently doesn't like constants...
     const prevText = 'E-stop';
     const prevColor = 'red';
-    estopElement.text = '...';
+    estopElement.text('...');
     $.ajax({
         url: '../api/machineState',
         type: 'PUT',
-        data: { estopped: true },
-        success: function () {
-            estopElement.text = 'E-stopped';
+        contentType: 'application/json',
+        data: JSON.stringify({ estopped: true }),
+        success: function (msg) {
+            estopElement.text('E-stopped');
             estopElement.css('background-color', '#00FF00');
             setTimeout(function () {
-                estopElement.text = prevText;
+                estopElement.text(prevText);
                 estopElement.css('background-color', prevColor);
             }, 500);
+        },
+        error: function(msg) {
+            estopElement.text(prevText);
+            estopElement.css('background-color', prevColor);
+            console.log(msg);
+            alert('ERROR - Estop FAILED\n'+msg.responseText);
         }
     });
 };

@@ -13,7 +13,7 @@ class SpeedControlException(Exception):
 	def __str__(self):
 		return str(self.message)
 	def __repr__(self):
-		return 'MultivatorException(message=%s, cause=%s)'%(repr(self.message), repr(self.cause))
+		return 'SpeedControlException(message=%s, cause=%s)'%(repr(self.message), repr(self.cause))
 
 class SpeedController:
 	def __init__(self, ip = DEFAULT_IP, port = DEFAULT_PORT):
@@ -60,9 +60,12 @@ class SpeedController:
 	def connect(self):
 		"""Connects to the speed controller listening at the specified IP address and port number."""
 		self.disconnect()
-		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.socket.settimeout(MSG_TIMEOUT)
-		self.socket.connect((self.ip, self.port))
+		try:
+			self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			self.socket.settimeout(MSG_TIMEOUT)
+			self.socket.connect((self.ip, self.port))
+		except OSError as ex:
+			raise SpeedControlException('Could not connect to speed controller: %s'%(str(ex)), ex)
 	def disconnect(self):
 		if self.isconnected():
 			self.socket.close()

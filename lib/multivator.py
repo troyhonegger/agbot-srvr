@@ -124,9 +124,12 @@ class Multivator:
 	def connect(self):
 		"""Connects to the multivator listening at the specified IP address and port number."""
 		self.disconnect()
-		self.socket = self.create_socket(self);
-		self.socket.settimeout(MSG_TIMEOUT)
-		self.socket.connect((self.ip,self.port))
+		try:
+			self.socket = self.create_socket(self);
+			self.socket.settimeout(MSG_TIMEOUT)
+			self.socket.connect((self.ip,self.port))
+		except OSError as ex:
+			raise MultivatorException('Could not connect to multivator - %s'%(str(ex)), ex)
 		if self.initial_mode is not None:
 			self.set_mode(self.initial_mode)
 	def disconnect(self):

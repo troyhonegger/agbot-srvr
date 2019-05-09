@@ -35,16 +35,24 @@ class MachineState:
 	@cherrypy.tools.json_in()
 	def PUT(self):
 		if cherrypy.request.json['estopped']:
-			estop.estop(kill_processor = True, new_process = True)
+			# try and estop. If it fails, return error code
+			try:
+				estop.estop(kill_processor = True, new_process = False)
+				cherrypy.response.status = '200 OK'
+			except estop.EstopError as ex:
+				cherrypy.response.status = '500 Internal Server Error'
+				return repr(ex)
 		elif cherrypy.request.json['processing'] == True:
 			if _processor_pid() is None:
 				subprocess.Popen('/home/agbot/agbot-srvr/processor.py')
+			cherrypy.response.status = '200 OK'
 		elif cherrypy.request.json['processing'] == False:
 			pid = _processor_pid()
 			if pid is not None:
 				# send a SIGINT to processor.py. This more or less politely asks
 				# processor.py to shut down at its earliest convenience.
 				os.kill(pid, signal.SIGINT)
+			cherrypy.response.status = '200 OK'
 
 
 @cherrypy.popargs('recordID')
