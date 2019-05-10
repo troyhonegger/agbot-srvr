@@ -25,7 +25,7 @@ IN_ROW = 2
 END_OF_ROW = 3
 TURNING = 4
 
-# Adjust this to taste
+# TODO: Adjust this to taste
 THRESHOLD = 0.5
 
 net = 0
@@ -80,7 +80,7 @@ plants_map = {
     'corn': plants.Plants.NONE # ignore non-nitrogen deficient corn
 }
 
-def start_processor(ignore_multivator = False, ignore_speed_controller = False):
+def start_processor(cfg_path, weights_path, data_path, ignore_multivator = False, ignore_speed_controller = False):
 	global net
 	global meta
 	global cams
@@ -95,12 +95,11 @@ def start_processor(ignore_multivator = False, ignore_speed_controller = False):
 	else:
 		file = open(CURRENT, 'w+')
 		log.debug('Created %s', CURRENT)
-	# TODO: it'd be nice to use argparse to avoid hard-coding .cfg, .weights, and .data file paths, except as defaults
-	meta = darknet_wrapper.load_meta(b'/home/agbot/Yolo_mark_2/x64/Release/data/obj.data')
-	net = darknet_wrapper.load_net(b'/home/agbot/Yolo_mark_2/x64/Release/yolo-obj.cfg', b'/home/agbot/Yolo_mark_2/x64/Release/backup/yolo-obj_final.weights', 0)
+	meta = darknet_wrapper.load_meta(data_path.encode('utf-8'))
+	net = darknet_wrapper.load_net(cfg_path.encode('utf-8'), weights_path.encode('utf-8'), 0)
 	log.debug('Loaded neural network and metadata. net = %d, meta.classes = %d', net, meta.classes)
 	cams = cameras.open_cameras('id*')
-	cams_history= [True for cam in cams]
+	cams_history = [True for cam in cams]
 	log.debug('Opened cameras - %d found', len(cams))
 	if not ignore_multivator:
 		mult = multivator.Multivator(initial_mode = multivator.Mode.processing)
@@ -112,7 +111,7 @@ def start_processor(ignore_multivator = False, ignore_speed_controller = False):
 		speed_controller.start()
 		log.debug('Connected to speed controller')
 
-def process_detector(ignore_multivator = False, ignore_nmea = False, diagcam_id = None):
+def process_detector(ignore_nmea = False, diagcam_id = None):
 	global net
 	global meta
 	global cams
@@ -141,7 +140,7 @@ def process_detector(ignore_multivator = False, ignore_nmea = False, diagcam_id 
 		if draw_bbox:
 			cv2.imshow(diagcam_id, image)
 			cv2.waitKey(1)
-	if not ignore_multivator:
+	if mult is not None:
 		mult.send_process_message(results)
 	if not ignore_nmea:
 		gga = nmea.read_data(nmea.GGA)
@@ -172,9 +171,9 @@ def process_rowctrl():
 			speed_controller.exit_row()
 		row_state = TURNING
 
-def process(ignore_multivator = False, ignore_speed_controller = False, ignore_nmea = False, diagcam_id = None):
+def process(ignore_nmea = False, diagcam_id = None):
 	process_rowctrl()
-	process_detector(ignore_multivator, ignore_nmea, diagcam_id)
+	process_detector(ignore_nmea, diagcam_id)
 
 def stop_processor():
 	log.info('Shutting down processor...')
@@ -241,11 +240,11 @@ def sigint_handler(sig, frame):
 	sigint_received = True
 	signal.signal(signal.SIGINT, sigint_handler)
 
-def main(ignore_multivator = False, ignore_speed_controller = False, ignore_nmea = False, diagcam_id = None):
+def main(cfg_path, weights_path, data_path, ignore_multivator = False, ignore_speed_controller = False, ignore_nmea = False, diagcam_id = None):
 	start_processor(ignore_multivator, ignore_speed_controller)
 	try:
 		while not sigint_received:
-			process(ignore_multivator, ignore_speed_controller, ignore_nmea, diagcam_id)
+			process(cfg_path, weights_path, data_path, ignore_nmea, diagcam_id)
 		log.info('Received SIGINT - terminating processor.')
 	except Exception as exception:
 		log.exception(exception)
@@ -260,14 +259,17 @@ if __name__ == '__main__':
 	setproctitle.setproctitle('processor.py')
 	
 	parser = argparse.ArgumentParser()
-	parser.add_argument('-c', '--diagcam-id', default = None)
-	parser.add_argument('-n', '--ignore-nmea', action = 'store_true')
-	parser.add_argument('-m', '--ignore-multivator', action = 'store_true')
-	parser.add_argument('-s', '--ignore-speed-controller', action = 'store_true')
+	parser.add_argument('-c', '--cfg-file', default = '/home/agbot/Yolo_mark_2/x64/Release/yolo-obj.cfg', help='specify a *.cfg file for darknet. Defaults to the Yolo_mark_2 file')
+	parser.add_argument('-w', '--weights-file', default = '/home/agbot/Yolo_mark_2/x64/Release/backup/yolo-obj_final.weights', help='specify a *.weights file for darknet. Defaults to the Yolo_mark_2/.../yolo-obj-final.weights file')
+	parser.add_argument('-d', '--data-file', default = '/home/agbot/Yolo_mark_2/x64/Release/data/obj.data', help='specify a *.data file for darknet. Defaults to the Yolo_mark_2 file')
+	parser.add_argument('-v', '--diagcam-id', type=int, default = None)
+	parser.add_argument('-n', '--ignore-nmea', action = 'store_true', help='suppress listening for NMEA position data (also prevents writing results to CURRENT.rec).')
+	parser.add_argument('-m', '--ignore-multivator', action = 'store_true', help='suppress sending detection results to the multivator.')
+	parser.add_argument('-s', '--ignore-speed-controller', action = 'store_true', help='suppress sending start/stop/row commands to the speed controller.')
 	args = parser.parse_args()
 	# register signal handlers
 	signal.signal(signal.SIGINT, sigint_handler)
 	signal.signal(signal.SIGUSR1, sigusr1_handler)
 	signal.signal(signal.SIGUSR2, sigusr2_handler)
-	main(args.ignore_multivator, args.ignore_speed_controller, args.ignore_nmea, args.diagcam_id)
+	main(args.cfg_file, args.weights_file, args.data_file, args.ignore_multivator, args.ignore_speed_controller, args.ignore_nmea, args.diagcam_id)
 
