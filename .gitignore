@@ -4,3 +4,6 @@ __pycache__
 # PyDev project directories
 .project
 .pydevproject
+
+# Field records
+records/*
