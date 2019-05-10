@@ -68,9 +68,10 @@ def _draw_bbox(img, cls, x, y, w, h):
 		color = (255, 0, 0) #blue
 	else:
 		color = (0, 0, 0) #black
-	pt1 = (int((x-w/2) * len(img[0])), int((y-h/2) * len(img)))
-	pt2 = (int((x+w/2) * len(img[0])), int((y+h/2) * len(img)))
-	cv2.rectangle(img, pt1, pt2, color)
+	height, width, channels = img.shape
+	pt1 = (int((x-w/2) * width), int((y-h/2) * height))
+	pt2 = (int((x+w/2) * width), int((y+h/2) * height))
+	cv2.rectangle(img, pt1, pt2, color, thickness = 5)
 
 plants_map = {
     'foxtail': plants.Plants.Foxtail,
@@ -111,7 +112,7 @@ def start_processor(cfg_path, weights_path, data_path, ignore_multivator = False
 		speed_controller.start()
 		log.debug('Connected to speed controller')
 
-def process_detector(ignore_nmea = False, diagcam_id = None):
+def process_detector(threshold, ignore_nmea = False, diagcam_id = None):
 	global net
 	global meta
 	global cams
@@ -132,11 +133,15 @@ def process_detector(ignore_nmea = False, diagcam_id = None):
 			continue # skip this camera
 		else:
 			cams_history[i] = True
-		for (cls, confidence, (x, y, w, h)) in darknet_wrapper.detect_cv2(net, meta, image, thresh = THRESHOLD):
+		#t0 = time.time()
+		for (cls, confidence, (x, y, w, h)) in darknet_wrapper.detect_cv2(net, meta, image, thresh = threshold):
+			cls = cls.decode('latin-1')
+			#print('Found %s in %s'%(cls, camera.id))
 			if draw_bbox:
 				_draw_bbox(image, cls, x, y, w, h)
 			if cls in plants_map.keys():
 				results[map_location(camera.id, x, y)] |= plants_map[cls]
+		#print('ran detection in %fsec'%(time.time() - t0))
 		if draw_bbox:
 			cv2.imshow(diagcam_id, image)
 			cv2.waitKey(1)
@@ -149,12 +154,12 @@ def process_detector(ignore_nmea = False, diagcam_id = None):
 
 def process_rowctrl():
 	global row_state
+	global mult
+	global speed_controller
 	# if state is not changing, do nothing
 	if row_state != START_OF_ROW and row_state != END_OF_ROW:
 		return
 	elif row_state == START_OF_ROW:
-		global mult
-		global speed_controller
 		log.info('Entering row')
 		if mult is not None:
 			mult.process_lower_hitch()
@@ -162,8 +167,6 @@ def process_rowctrl():
 			speed_controller.enter_row()
 		row_state = IN_ROW
 	elif row_state == END_OF_ROW:
-		global mult
-		global speed_controller
 		log.info('End of row reached')
 		if mult is not None:
 			mult.process_lower_hitch()
@@ -171,9 +174,9 @@ def process_rowctrl():
 			speed_controller.exit_row()
 		row_state = TURNING
 
-def process(ignore_nmea = False, diagcam_id = None):
+def process(threshold, ignore_nmea = False, diagcam_id = None):
 	process_rowctrl()
-	process_detector(ignore_nmea, diagcam_id)
+	process_detector(threshold, ignore_nmea, diagcam_id)
 
 def stop_processor():
 	log.info('Shutting down processor...')
@@ -240,11 +243,11 @@ def sigint_handler(sig, frame):
 	sigint_received = True
 	signal.signal(signal.SIGINT, sigint_handler)
 
-def main(cfg_path, weights_path, data_path, ignore_multivator = False, ignore_speed_controller = False, ignore_nmea = False, diagcam_id = None):
-	start_processor(ignore_multivator, ignore_speed_controller)
+def main(cfg_path, weights_path, data_path, threshold, ignore_multivator = False, ignore_speed_controller = False, ignore_nmea = False, diagcam_id = None):
+	start_processor(cfg_path, weights_path, data_path, ignore_multivator, ignore_speed_controller)
 	try:
 		while not sigint_received:
-			process(cfg_path, weights_path, data_path, ignore_nmea, diagcam_id)
+			process(threshold, ignore_nmea, diagcam_id)
 		log.info('Received SIGINT - terminating processor.')
 	except Exception as exception:
 		log.exception(exception)
@@ -262,14 +265,18 @@ if __name__ == '__main__':
 	parser.add_argument('-c', '--cfg-file', default = '/home/agbot/Yolo_mark_2/x64/Release/yolo-obj.cfg', help='specify a *.cfg file for darknet. Defaults to the Yolo_mark_2 file')
 	parser.add_argument('-w', '--weights-file', default = '/home/agbot/Yolo_mark_2/x64/Release/backup/yolo-obj_final.weights', help='specify a *.weights file for darknet. Defaults to the Yolo_mark_2/.../yolo-obj-final.weights file')
 	parser.add_argument('-d', '--data-file', default = '/home/agbot/Yolo_mark_2/x64/Release/data/obj.data', help='specify a *.data file for darknet. Defaults to the Yolo_mark_2 file')
-	parser.add_argument('-v', '--diagcam-id', type=int, default = None)
+	parser.add_argument('-t', '--threshold', type=float, default = 0.5, help='specify the detection threshold. The default is 0.5.')
+	parser.add_argument('-v', '--diagcam-id', default = None)
 	parser.add_argument('-n', '--ignore-nmea', action = 'store_true', help='suppress listening for NMEA position data (also prevents writing results to CURRENT.rec).')
 	parser.add_argument('-m', '--ignore-multivator', action = 'store_true', help='suppress sending detection results to the multivator.')
 	parser.add_argument('-s', '--ignore-speed-controller', action = 'store_true', help='suppress sending start/stop/row commands to the speed controller.')
 	args = parser.parse_args()
+	if args.threshold < 0 or args.threshold > 1.0:
+		log.error('Invalid detection threshold: %f. %s will now shut down', args.threshold, __file__)
+		raise ValueError('Invalid threshold: %f', args.threshold)
 	# register signal handlers
 	signal.signal(signal.SIGINT, sigint_handler)
 	signal.signal(signal.SIGUSR1, sigusr1_handler)
 	signal.signal(signal.SIGUSR2, sigusr2_handler)
-	main(args.cfg_file, args.weights_file, args.data_file, args.ignore_multivator, args.ignore_speed_controller, args.ignore_nmea, args.diagcam_id)
+	main(args.cfg_file, args.weights_file, args.data_file, args.threshold, args.ignore_multivator, args.ignore_speed_controller, args.ignore_nmea, args.diagcam_id)
 
