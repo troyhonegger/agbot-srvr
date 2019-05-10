@@ -108,24 +108,35 @@ def open_cameras(*patterns):
 
 if __name__ == "__main__":
 	import argparse
+	import os
+	import datetime
+	import time
 	parser = argparse.ArgumentParser(description = "View live feed from the weed camera(s)")
+	parser.add_argument('-s', '--store', action = 'store_true', help='Select this option to store the images taken to /home/agbot/images')
 	parser.add_argument('--filter', '-f', default='*', \
 						help='Specify a filter for which cameras to open - the default is \'*\'', required=False)
 	args = parser.parse_args()
 	log.debug('Starting camera diagnostics program')
 	cameras = open_cameras(args.filter)
-	while True:
-		for i in range(0, len(cameras)):
-			ret, img = cameras[i].read()
-			if not ret:
-				cameras[i].release()
-				cameras.remove(cameras[i])
-			else:
-				cv2.imshow(str(cameras[i]), img)
-		if len(cameras) == 0:
-			break
-		if cv2.waitKey(1) & 0xFF == ord('q'):
-			for camera in cameras:
-				camera.release()
-			cv2.destroyAllWindows()
-			break
+	last_store_times = [datetime.datetime(1970,1,1)] * len(cameras)
+	try:
+		while True:
+			for i in range(0, len(cameras)):
+				ret, img = cameras[i].read()
+				if not ret:
+					cameras[i].release()
+					cameras.remove(cameras[i])
+				else:
+					cv2.imshow(str(cameras[i]), img)
+					now = datetime.datetime.now()
+					if args.store and (now - last_store_times[i]).total_seconds() > 0.1: # min delay between frames is 0.1 sec
+						cv2.imwrite('/home/agbot/images/%s-%s.jpg'%(datetime.datetime.now().isoformat(), str(cameras[i])), img)
+						last_store_times[i] = now
+			if len(cameras) == 0 or (cv2.waitKey(1) & 0xFF == ord('q')):
+				break
+	except KeyboardInterrupt:
+		pass # just quit silently
+	finally:
+		for camera in cameras:
+			camera.release()
+		cv2.destroyAllWindows()
