@@ -10,22 +10,17 @@ from lib import loghelper
 log = loghelper.get_logger(__file__)
 
 class VideoCamera:
-	def __init__(self, port, id = None, serial = None):
+	def __init__(self, stream, id = None, serial = None, port = None):
 		""" Initializes a new VideoCamera.
+		stream is a cv2.VideoCapture corresponding to a source of video.
 		id is the value referred to by the agBot software to identify the camera based on its position
 		serial is a string with the serial number of the camera and will usually consist only of hexadecimal digits
 		port is the /dev/videoX port number used by the OS to identify the camera
 		"""
+		self.stream = stream
+		self.serial = serial
 		self.port = port
 		self.id = id
-		self.serial = serial
-		self.stream = None
-	def __enter__(self):
-		if self.stream is not None: self.__exit__()
-		self.stream = cv2.VideoCapture(self.port)
-	def __exit__(self, exc_type, exc_value, tb):
-		self.release()
-		return exc_type is None
 	def release(self):
 		if self.stream is not None:
 			self.stream.release()
@@ -41,7 +36,7 @@ class CameraException(Exception):
 	def __init__(self, message = None):
 		self.message = message
 
-def map_cameras(*patterns):
+def open_cameras(*patterns):
 	""" Opens and returns all connected cameras whose ID matches one of the patterns.
 	Examples:
 		open_cameras() # equivalent to open_cameras('*')
@@ -108,7 +103,7 @@ def map_cameras(*patterns):
 			continue
 		else:
 			log.info('Successfully mapped /dev/video%s to camera %s', port, camera_id)
-			cameras.append(VideoCamera(port, camera_id, serial))
+			cameras.append(VideoCamera(cv2.VideoCapture(port), camera_id, serial, port))
 	return sorted(cameras, key=lambda camera: camera.id)
 
 if __name__ == "__main__":
@@ -118,17 +113,19 @@ if __name__ == "__main__":
 						help='Specify a filter for which cameras to open - the default is \'*\'', required=False)
 	args = parser.parse_args()
 	log.debug('Starting camera diagnostics program')
-	cameras = map_cameras(args.filter)
+	cameras = open_cameras(args.filter)
 	while True:
 		for i in range(0, len(cameras)):
-			with cameras[i]:
-				ret, img = cameras[i].read()
-				if not ret:
-					cameras.remove(cameras[i])
-				else:
-					cv2.imshow(str(cameras[i]), img)
+			ret, img = cameras[i].read()
+			if not ret:
+				cameras[i].release()
+				cameras.remove(cameras[i])
+			else:
+				cv2.imshow(str(cameras[i]), img)
 		if len(cameras) == 0:
 			break
 		if cv2.waitKey(1) & 0xFF == ord('q'):
+			for camera in cameras:
+				camera.release()
 			cv2.destroyAllWindows()
 			break

@@ -91,11 +91,9 @@ def start_processor(ignore_multivator = False, ignore_speed_controller = False):
 	meta = darknet_wrapper.load_meta(b'/home/agbot/Yolo_mark_2/x64/Release/data/obj.data')
 	net = darknet_wrapper.load_net(b'/home/agbot/Yolo_mark_2/x64/Release/yolo-obj.cfg', b'/home/agbot/Yolo_mark_2/x64/Release/backup/yolo-obj_final.weights', 0)
 	log.debug('Loaded neural network and metadata. net = %d, meta.classes = %d', net, meta.classes)
-	# NOTE: we do this only once, at startup. In practice, this should be fine, but if we "hot-swap" cameras
-	# while the detector is running we will probably run into mapping issues.
-	cams = cameras.map_cameras('id*')
+	cams = cameras.open_cameras('id*')
 	cams_history= [True for cam in cams]
-	log.debug('Mapped cameras - %d found', len(cams))
+	log.debug('Opened cameras - %d found', len(cams))
 	if not ignore_multivator:
 		mult = multivator.Multivator(initial_mode = multivator.Mode.processing)
 		mult.connect()
@@ -117,29 +115,24 @@ def process_detector(ignore_multivator = False, ignore_nmea = False, diagcam_id 
 	i = -1
 	results = [plants.Plants.NONE] * 5
 	for camera in cams:
-		with camera:
-			draw_bbox = camera.id == diagcam_id
-			i += 1 # increment i here just so we don't forget if we add a continue or something to the loop
-			ret, image = camera.read()
-			if not ret: #ERROR - skip this camera
-				if cams_history[i]:
-					log.error('Could not read image from camera %s', camera.id)
-				cams_history[i] = False
-				continue # skip this camera
-			else:
-				cams_history[i] = True
-			t0 = time.time()
-			detections = darknet_wrapper.detect_cv2(net, meta, image, thresh = THRESHOLD)
-			t1 = time.time()
-			print(t1 - t0)
-			for (cls, confidence, (x, y, w, h)) in detections:
-				if draw_bbox:
-					_draw_bbox(image, cls, x, y, w, h)
-				if cls in plants_map.keys():
-					results[map_location(camera.id, x, y)] |= plants_map[cls]
+		draw_bbox = camera.id == diagcam_id
+		i += 1 # increment i here just so we don't forget if we add a continue or something to the loop
+		ret, image = camera.read()
+		if not ret: #ERROR - skip this camera
+			if cams_history[i]:
+				log.error('Could not read image from camera %s', camera.id)
+			cams_history[i] = False
+			continue # skip this camera
+		else:
+			cams_history[i] = True
+		for (cls, confidence, (x, y, w, h)) in darknet_wrapper.detect_cv2(net, meta, image, thresh = THRESHOLD):
 			if draw_bbox:
-				cv2.imshow(diagcam_id, image)
-				cv2.waitKey(1)
+				_draw_bbox(image, cls, x, y, w, h)
+			if cls in plants_map.keys():
+				results[map_location(camera.id, x, y)] |= plants_map[cls]
+		if draw_bbox:
+			cv2.imshow(diagcam_id, image)
+			cv2.waitKey(1)
 	if not ignore_multivator:
 		mult.send_process_message(results)
 	if not ignore_nmea:
@@ -179,8 +172,11 @@ def stop_processor():
 		darknet_wrapper.reset_rnn(net)
 		net = 0
 		meta = None
-	# release camera map
-	cams = []
+	if len(cams) != 0:
+		log.debug('Releasing all cameras (%d found)', len(cams))
+		for camera in cams:
+			camera.release()
+		cams = []
 	if mult is not None:
 		log.debug('Disconnecting from multivator')
 		# switching to diag is probably very bad practice, but it's the quickest way to really stop everything
