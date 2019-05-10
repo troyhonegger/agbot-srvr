@@ -117,24 +117,6 @@ def process_detector(ignore_multivator = False, ignore_nmea = False, diagcam_id 
 	i = -1
 	results = [plants.Plants.NONE] * 5
 	for camera in cams:
-<<<<<<< HEAD
-		draw_bbox = camera.id == diagcam_id
-		i += 1 # increment i here just so we don't forget if we add a continue or something to the loop
-		ret, image = camera.read()
-		if not ret: #ERROR - skip this camera
-			if cams_history[i]:
-				log.error('Could not read image from camera %s', camera.id)
-			cams_history[i] = False
-			continue # skip this camera
-		else:
-			cams_history[i] = True
-		for (cls, confidence, (x, y, w, h)) in darknet_wrapper.detect_cv2(net, meta, image, thresh = THRESHOLD):
-			if draw_bbox:
-				_draw_bbox(image, cls, x, y, w, h)
-				cv2.imshow(diagcam_id, image)
-			if cls in plants_map.keys():
-				results[map_location(camera.id, x, y)] |= plants_map[cls]
-=======
 		with camera:
 			draw_bbox = camera.id == diagcam_id
 			i += 1 # increment i here just so we don't forget if we add a continue or something to the loop
@@ -152,7 +134,6 @@ def process_detector(ignore_multivator = False, ignore_nmea = False, diagcam_id 
 					cv2.imshow(diagcam_id, image)
 				if cls in plants_map.keys():
 					results[map_location(camera.id, x, y)] |= plants_map[cls]
->>>>>>> 8d54975147bcdba9c6d3e0e096bb72d70bda26ef
 	if not ignore_multivator:
 		mult.send_process_message(results)
 	if not ignore_nmea:
@@ -182,11 +163,7 @@ def stop_processor():
 		files = [file for file in os.listdir(records.DIR) if file.startswith(date) and file.endswith(records.EXT)]
 		# trim the date and extension from the file names and parse the numbers
 		numbers = [int(file[len(date) + 1:-len(records.EXT)]) for file in files]
-<<<<<<< HEAD
-		path = '%s/%s_%d%s'%(records.DIR, date, num, records.EXT)
-=======
 		num = 0 if len(numbers) == 0 else max(numbers) + 1
->>>>>>> 8d54975147bcdba9c6d3e0e096bb72d70bda26ef
 		path = records.DIR + '/' + date + '_' + str(num) + records.EXT
 		log.debug('Moving %s to %s', CURRENT, path)
 		shutil.copy(CURRENT, path)
