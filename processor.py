@@ -85,14 +85,14 @@ def start_processor(ignore_multivator = False, ignore_speed_controller = False):
 		log.error('CURRENT file %s already exists. Throwing exception...', CURRENT)
 		raise ValueError('Processor is already running. If you did not start processor, delete the file %s and try again'%(CURRENT))
 	else:
-		file = open(CURRENT, 'w')
+		file = open(CURRENT, 'w+')
 		log.debug('Created %s', CURRENT)
 	# TODO: it'd be nice to use argparse to avoid hard-coding .cfg, .weights, and .data file paths, except as defaults
 	meta = darknet_wrapper.load_meta(b'/home/agbot/Yolo_mark_2/x64/Release/data/obj.data')
 	net = darknet_wrapper.load_net(b'/home/agbot/Yolo_mark_2/x64/Release/yolo-obj.cfg', b'/home/agbot/Yolo_mark_2/x64/Release/backup/yolo-obj_final.weights', 0)
 	log.debug('Loaded neural network and metadata. net = %d, meta.classes = %d', net, meta.classes)
 	cams = cameras.open_cameras('id*')
-	cams_history= [None for cam in cams]
+	cams_history= [True for cam in cams]
 	log.debug('Opened cameras - %d found', len(cams))
 	if not ignore_multivator:
 		mult = multivator.Multivator(initial_mode = multivator.Mode.processing)
@@ -127,7 +127,7 @@ def process_detector(ignore_multivator = False, ignore_nmea = False, diagcam_id 
 			cams_history[i] = True
 		for (cls, confidence, (x, y, w, h)) in darknet_wrapper.detect_cv2(net, meta, image, thresh = THRESHOLD):
 			if draw_bbox:
-				draw_bbox(image, cls, x, y, w, h)
+				_draw_bbox(image, cls, x, y, w, h)
 				cv2.imshow(diagcam_id, image)
 			if cls in plants_map.keys():
 				results[map_location(camera.id, x, y)] |= plants_map[cls]
@@ -156,12 +156,12 @@ def stop_processor():
 		file.close()
 		file = None
 		
-		date = str(datetime.date.today)
+		date = str(datetime.date.today())
 		files = [file for file in os.listdir(records.DIR) if file.startswith(date) and file.endswith(records.EXT)]
 		# trim the date and extension from the file names and parse the numbers
 		numbers = [int(file[len(date) + 1:-len(records.EXT)]) for file in files]
-		num = 0 if len(numbers) == 0 else max(numbers) + 1
-		path = records.DIR + date + '_' + num + records.EXT
+		path = '%s/%s_%d%s'%(records.DIR, date, num, records.EXT)
+		path = records.DIR + '/' + date + '_' + str(num) + records.EXT
 		log.debug('Moving %s to %s', CURRENT, path)
 		shutil.copy(CURRENT, path)
 		os.remove(CURRENT)
