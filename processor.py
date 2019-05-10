@@ -139,7 +139,6 @@ def process_detector(ignore_multivator = False, ignore_nmea = False, diagcam_id 
 		gga = nmea.read_data(nmea.GGA)
 		record = records.RecordLine(datetime.datetime.now(), gga.longitude, gga.latitude, results)
 		print(str(record), file)
-		file.flush()
 
 def process(ignore_multivator = False, ignore_speed_controller = False, ignore_nmea = False, diagcam_id = None):
 	# TODO: update this with end-of-row detection and handling
