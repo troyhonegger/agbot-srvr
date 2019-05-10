@@ -23,8 +23,9 @@ class VideoCamera:
 	def __enter__(self):
 		if self.stream is not None: self.__exit__()
 		self.stream = cv2.VideoCapture(self.port)
-	def __exit__(self):
+	def __exit__(self, exc_type, exc_value, tb):
 		self.release()
+		return exc_type is None
 	def release(self):
 		if self.stream is not None:
 			self.stream.release()

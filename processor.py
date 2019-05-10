@@ -1,5 +1,5 @@
 #!/usr/bin/python
-
+import time
 import os
 import datetime
 import shutil
@@ -48,7 +48,7 @@ def map_location(camera_id, x, y):
 	else:
 		return None
 
-def _draw_bbox(img, cls, x, y, z, w, h):
+def _draw_bbox(img, cls, x, y, w, h):
 	if cls == 'foxtail':
 		color = (0, 0, 255) #red
 	elif cls == 'corn':
@@ -61,8 +61,8 @@ def _draw_bbox(img, cls, x, y, z, w, h):
 		color = (255, 0, 0) #blue
 	else:
 		color = (0, 0, 0) #black
-	pt1 = ((x-w/2) * len(img[0]), (y-h/2) * len(img))
-	pt2 = ((x+w/2) * len(img[0]), (y+h/2) * len(img))
+	pt1 = (int((x-w/2) * len(img[0])), int((y-h/2) * len(img)))
+	pt2 = (int((x+w/2) * len(img[0])), int((y+h/2) * len(img)))
 	cv2.rectangle(img, pt1, pt2, color)
 
 plants_map = {
@@ -128,12 +128,18 @@ def process_detector(ignore_multivator = False, ignore_nmea = False, diagcam_id 
 				continue # skip this camera
 			else:
 				cams_history[i] = True
-			for (cls, confidence, (x, y, w, h)) in darknet_wrapper.detect_cv2(net, meta, image, thresh = THRESHOLD):
+			t0 = time.time()
+			detections = darknet_wrapper.detect_cv2(net, meta, image, thresh = THRESHOLD)
+			t1 = time.time()
+			print(t1 - t0)
+			for (cls, confidence, (x, y, w, h)) in detections:
 				if draw_bbox:
 					_draw_bbox(image, cls, x, y, w, h)
-					cv2.imshow(diagcam_id, image)
 				if cls in plants_map.keys():
 					results[map_location(camera.id, x, y)] |= plants_map[cls]
+			if draw_bbox:
+				cv2.imshow(diagcam_id, image)
+				cv2.waitKey(1)
 	if not ignore_multivator:
 		mult.send_process_message(results)
 	if not ignore_nmea:
