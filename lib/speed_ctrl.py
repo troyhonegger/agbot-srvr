@@ -82,6 +82,10 @@ class SpeedController:
 		self._send_msg('Start', True)
 	def stop(self):
 		self._send_msg('Stop', True)
+	def enter_row(self):
+		self._send_msg('EnterRow', True)
+	def exit_row(self):
+		self._send_msg('ExitRow', True)
 
 if __name__ == '__main__':
 	import sys

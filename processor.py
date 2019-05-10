@@ -19,6 +19,11 @@ from lib import plants
 log = loghelper.get_logger(__file__)
 CURRENT = os.path.join(records.DIR, records.CURRENT + records.EXT)
 
+START_OF_ROW = 1
+IN_ROW = 2
+END_OF_ROW = 3
+TURNING = 4
+
 # Adjust this to taste
 THRESHOLD = 0.5
 
@@ -30,6 +35,7 @@ sigint_received = False
 file = None
 mult = None
 speed_controller = None
+row_state = START_OF_ROW
 
 # TODO: update this as needed to more accurately match our camera layout.
 def map_location(camera_id, x, y):
@@ -80,6 +86,7 @@ def start_processor(ignore_multivator = False, ignore_speed_controller = False):
 	global cams_history
 	global file
 	global mult
+	global speed_controller
 	log.info('Starting processor...')
 	if os.path.exists(os.path.join(records.DIR, CURRENT)):
 		log.error('CURRENT file %s already exists. Throwing exception...', CURRENT)
@@ -140,8 +147,31 @@ def process_detector(ignore_multivator = False, ignore_nmea = False, diagcam_id 
 		record = records.RecordLine(datetime.datetime.now(), gga.longitude, gga.latitude, results)
 		print(str(record), file)
 
+def process_rowctrl():
+	global row_state
+	if row_state != START_OF_ROW and row_state != END_OF_ROW:
+		return
+	elif row_state == START_OF_ROW:
+		global mult
+		global speed_controller
+		log.info('Entering row')
+		if mult is not None:
+			mult.process_lower_hitch()
+		if speed_controller is not None:
+			speed_controller.enter_row()
+		row_state = IN_ROW
+	elif row_state == END_OF_ROW:
+		global mult
+		global speed_controller
+		log.info('End of row reached')
+		if mult is not None:
+			mult.process_lower_hitch()
+		if speed_controller is not None:
+			speed_controller.exit_row()
+		row_state = TURNING
+
 def process(ignore_multivator = False, ignore_speed_controller = False, ignore_nmea = False, diagcam_id = None):
-	# TODO: update this with end-of-row detection and handling
+	process_rowctrl()
 	process_detector(ignore_multivator, ignore_nmea, diagcam_id)
 
 def stop_processor():
@@ -192,6 +222,16 @@ def stop_processor():
 	nmea.close()
 	log.info('Processor successfully shut down - the program will now exit')
 
+# SIGUSR1 signifies start of row
+def sigusr1_handler(sig, frame):
+	global row_state
+	row_state = START_OF_ROW
+
+# SIGUSR2 signifies end of row
+def sigusr2_handler(sig, frame):
+	global row_state
+	row_state = END_OF_ROW
+
 def sigint_handler(sig, frame):
 	"""Run whenever the process receives a SIGINT signal (either from a user pressing CTRL+C, or from another process).
 	This handler prevents an immediate shutdown, but it sets a flag that signals the main loop to cleanup and stop the processor"""
@@ -223,7 +263,9 @@ if __name__ == '__main__':
 	parser.add_argument('-m', '--ignore-multivator', action = 'store_true')
 	parser.add_argument('-s', '--ignore-speed-controller', action = 'store_true')
 	args = parser.parse_args()
-	# register SIGINT handler
+	# register signal handlers
 	signal.signal(signal.SIGINT, sigint_handler)
+	signal.signal(signal.SIGUSR1, sigusr1_handler)
+	signal.signal(signal.SIGUSR2, sigusr2_handler)
 	main(args.ignore_multivator, args.ignore_speed_controller, args.ignore_nmea, args.diagcam_id)
 

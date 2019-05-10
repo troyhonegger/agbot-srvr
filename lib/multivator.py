@@ -217,6 +217,10 @@ class Multivator:
 		for entry in plants:
 			message += hex(entry)[2:]
 		self._send_msg(message, True)
+	def process_raise_hitch(self):
+		self._send_msg('ProcessRaiseHitch', True)
+	def process_lower_hitch(self):
+		self._send_msg('ProcessLowerHitch', True)
 
 if __name__ == '__main__':
 	import sys
