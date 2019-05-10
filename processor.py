@@ -19,6 +19,7 @@ from lib import plants
 log = loghelper.get_logger(__file__)
 CURRENT = os.path.join(records.DIR, records.CURRENT + records.EXT)
 
+ROW_STATE_UNSET = 0
 START_OF_ROW = 1
 IN_ROW = 2
 END_OF_ROW = 3
@@ -35,7 +36,7 @@ sigint_received = False
 file = None
 mult = None
 speed_controller = None
-row_state = START_OF_ROW
+row_state = ROW_STATE_UNSET
 
 # TODO: update this as needed to more accurately match our camera layout.
 def map_location(camera_id, x, y):
@@ -149,6 +150,7 @@ def process_detector(ignore_multivator = False, ignore_nmea = False, diagcam_id 
 
 def process_rowctrl():
 	global row_state
+	# if state is not changing, do nothing
 	if row_state != START_OF_ROW and row_state != END_OF_ROW:
 		return
 	elif row_state == START_OF_ROW:

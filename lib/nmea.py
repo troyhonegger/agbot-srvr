@@ -1,6 +1,8 @@
 #!/usr/bin/python
 
 import pynmea2
+import subprocess
+import datetime
 
 DIR = '/home/agbot/nmea'
 
@@ -20,7 +22,37 @@ _files = {
 	VTG: None,
 	ZDA: None,
 }
-	
+
+def _processor_pid():
+	try:
+		# runs 'pidof processor.py' in a shell and returns the output (a list
+		# of PIDs), or raises a CalledProcessError upon a nonzero exit code.
+		return int(subprocess.check_output(['pidof', 'processor.py']).split()[0])
+	except subprocess.CalledProcessError:
+		return None
+
+# TODO: fine tune through testing
+_MAX_EOR_INTERVAL = 3.0 # only remember velocity data from the last three seconds
+_MIN_EOR_INTERVAL = 1.0 # if we only have data from the past 1.0 seconds, discard the result as too noisy
+_TURN_SPEED_CUTOFF = 5.0 # if we average 5 degrees/sec for 3 seconds, assume we're turning
+_vtg_history = []
+
+def is_turning(vtg_msg):
+	# remove queue elements older than _EOR_INTERVAL seconds old
+	now = datetime.datetime.now()
+	for date, msg in _vtg_history:
+		if (date - now).total_seconds() >= _MAX_EOR_INTERVAL:
+			_vtg_history.remove((date,msg))
+	# add current element to history
+	_vtg_history.append((now, vtg_msg))
+	# compute change in heading (dh) / change in time (dt)
+	time0, msg0 = _vtg_history[0]
+	dt = (now - time0).total_seconds
+	if dt < _MIN_EOR_INTERVAL: return None # we don't know if we're turning
+	dh = vtg_msg.true_track - msg0.true_track
+	abs_dh = min(abs(dh), abs(dh - 360.0))
+	return dt != 0 and abs_dh/dt > _TURN_SPEED_CUTOFF
+
 def read_data(type):
 	global _files
 	if type not in _files.keys:
@@ -46,17 +78,21 @@ def close():
 
 if __name__ == '__main__':
 	import argparse
+	import os
+	import signal
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-p', '--port', default = '/dev/ttyS0', required = False, help = 'The serial port on which to listen. The default is /dev/ttyS0')
+	parser.add_argument('-t', '--ignore-turn', action = 'store_true', help = 'Use this flag to suppress end-of-row detection')
 	args = parser.parse_args()
 	from lib import loghelper
-	import os
 	log = loghelper.get_logger(__file__)
 	log.info('Starting up NMEA listener on serial port %s...', args.port)
 	try:
 		for type in _files:
 			_files[type] = open(os.path.join(DIR, type + '.txt'), 'w')
-		with open(args.port, 'w') as nmea_port:
+		with open(args.port, 'r') as nmea_port:
+			if not args.ignore_turn:
+				was_turning = None
 			for line in nmea_port:
 				try:
 					data = pynmea2.parse(line.strip())
@@ -67,6 +103,13 @@ if __name__ == '__main__':
 						# NOTE: if a longer message is followed by a shorter one, this will leave garbage left over after the first line.
 						# It shouldn't be a big deal as read_data() only reads the first line, but it's something to keep in mind.
 						_files[type].seek(0)
+						if type == VTG and not args.ignore_turn:
+							turning = is_turning(data)
+							if turning is not None and turning != was_turning:
+								was_turning = turning
+								pid = _processor_pid()
+								if pid is not None:
+									os.kill(pid, signal.SIGUSR2 if turning else signal.SIGUSR1)
 					else:
 						log.warning('Received unrecognized message type %s', type)
 				except pynmea2.ChecksumError:
