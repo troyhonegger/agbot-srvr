@@ -90,6 +90,9 @@ body {
   position: fixed;
   border-radius: 0px; }
 
+#main {
+  margin: 10px; }
+
 @media screen and (min-width: 785px) {
   .large-screen-only {
     font-size: inherit; }
@@ -113,6 +116,9 @@ body {
 
   body {
     margin: 0% 10%; }
+
+  #main {
+    margin: 0px; }
 
   #footer {
     width: 80%;
