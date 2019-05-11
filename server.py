@@ -71,10 +71,12 @@ class Records:
 			try:
 				record = records.get_summary(recordID)
 				return {
+					'recordID': record.record_id,
+					'name': record.record_name,
 					'startTime': record.start_time.isoformat(),
 					'endTime': record.end_time.isoformat(),
 					'longitude': record.longitude,
-					'latitude': record.latitude,
+					'latitude': record.latitude
 				}
 			except FileNotFoundError:
 				raise cherrypy.HTTPError(404, 'Not Found - record %s does not exist'%(recordID))

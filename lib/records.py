@@ -16,23 +16,20 @@ CURRENT = 'CURRENT'
 MAX_IMG_WIDTH = 1500
 MAX_IMG_HEIGHT = 700
 
-#returns tuple of (recordID, name)
+
+def get_name(record_id):
+	# for now, names and record IDs are synonymous
+	return record_id
+
 def get_records():
 	files = [file[:-len(EXT)] for file in os.listdir(DIR) if os.path.isfile(file) and file.endswith(EXT)]
-	return [(name, name) for name in files]
-
-def read_record(record_id):
-	path = '%s/%s.%s'%(EXT, record_id, DIR)
-	if os.path.dirname(os.path.abspath('..\\re.rec')) != DIR or not os.path.isfile(path):
-		raise FileNotFoundError('%s is not a valid record file'%(record_id))
-	with open(path) as file:
-		return Record.read(file)
+	return [(record_id, get_name(record_id)) for record_id in files]
 
 def get_image(record_id):
-	return read_record(record_id).render()
+	return Record.read(record_id).render()
 
 def get_summary(record_id):
-	return read_record(record_id).get_summary()
+	return Record.read(record_id).get_summary()
 
 def _vec(*components):
 	return numpy.array(components, numpy.float64)
@@ -93,7 +90,9 @@ class RecordLine:
 		return '%s %f %f %s'%(self.timestamp.isoformat(), self.longitude, self.latitude, ', '.join([str(row) for row in self.rows]))
 
 class RecordSummary:
-	def __init__(self, start_time, end_time, latitude, longitude):
+	def __init__(self, record_id, record_name, start_time, end_time, latitude, longitude):
+		self.record_id = record_id
+		self.record_name = record_name
 		self.start_time = start_time
 		self.end_time = end_time
 		self.longitude = longitude
@@ -101,12 +100,18 @@ class RecordSummary:
 
 class Record:
 	@classmethod
-	def read(cls, file):
-		record = Record()
-		for line in file.lines:
-			record.lines.append(RecordLine.read(line.trim()))
+	def read(cls, record_id):
+		path = '%s.%s'%(record_id, EXT)
+		if not path in os.listdir(DIR):
+			raise FileNotFoundError('%s is not a valid record file'%(record_id))
+		record = Record(record_id, get_name(record_id))
+		with open(DIR + path) as file:
+			for line in file:
+				record.lines.append(RecordLine.read(line.trim()))
 		return record
-	def __init__(self):
+	def __init__(self, record_id, name):
+		self.record_id = record_id
+		self.name = name
 		self.lines = []
 	def __iter__(self):
 		return self.lines.__iter__()
@@ -146,14 +151,15 @@ class Record:
 		if self.summary is None:
 			if len(self) == 0:
 				raise ValueError('Cannot compute summary of an empty record')
-			avg_latitude = sum(record.latitude for record in self) / len(self) if len(self) != 0 else 0.0
+			avg_latitude = sum(record.latitude for record in self) / len(self)
 			longitudes1 = numpy.array((record.longitude for record in self), numpy.float64)
 			longitudes2 = numpy.array((record.longitude if record.longitude < 180.0 else record.longitude - 360.0 \
 									for record in self), numpy.float64)
 			avg_longitude = numpy.average(longitudes2) \
 							if numpy.std(longitudes2) < numpy.std(longitudes1) \
 							else numpy.average(longitudes1)
-			self.summary = RecordSummary( \
+			self.summary = RecordSummary(
+				self.record_id, self.name, \
 				min(record.timestamp for record in self), \
 				max(record.timestamp for record in self), \
 				avg_latitude, avg_longitude)

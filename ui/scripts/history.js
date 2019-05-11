@@ -7,7 +7,7 @@ $(document).ready(function() {
             if (msg.length !== 0) {
                 var historyTable = $('#history_table');
                 for (var i = 0; i < msg.length; i++) {
-                    historyTable.append('<tr><td><a href="../api/records/'+msg[i].recordID+'">'+msg[i].name+'</a></td></tr>');
+                    historyTable.append('<tr><td><a href="record.html?recordID='+msg[i].recordID+'">'+msg[i].name+'</a></td></tr>');
                 }
                 historyTable.css('visibility', 'visible');
                 $('#history_notfound').css('visibility', 'collapse');

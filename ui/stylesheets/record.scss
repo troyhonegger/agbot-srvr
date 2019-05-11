@@ -1,0 +1,14 @@
+@import 'common';
+
+#record_info {
+    h1 { margin: 20px 0px 0px 0px; }
+    hr {
+        margin: 0px;
+        background-image: linear-gradient(90deg, black, transparent);
+        height: 2px;
+        border: 0;
+    }
+    .header {
+        font-weight: bold;
+    }
+}
