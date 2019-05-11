@@ -5,7 +5,7 @@ var btnProcessing_Click = function() {};
 var processing = false;
 
 function updateImage() {
-    $('.record-img').src('../api/records/CURRENT');
+    $('.record-img').attr('src', '../api/records/CURRENT/image?time='+new Date().getTime());
 }
 
 var processingTimerID = null;
@@ -31,7 +31,7 @@ function updateUI_processingStopped() {
         processingTimerID = null;
     }
 }
-function updateProcessingState(var newState) {
+function updateProcessingState(newState) {
     if (typeof(newState) === 'undefined') {
         $.ajax({
             url: '../api/machineState',

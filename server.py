@@ -34,7 +34,8 @@ class MachineState:
 	@cherrypy.tools.accept(media = 'application/json')
 	@cherrypy.tools.json_in()
 	def PUT(self):
-		if cherrypy.request.json['estopped']:
+		json_properties = cherrypy.request.json.keys()
+		if 'estopped' in json_properties:
 			# try and estop. If it fails, return error code
 			try:
 				estop.estop(kill_processor = True, new_process = False)
@@ -42,11 +43,11 @@ class MachineState:
 			except estop.EstopError as ex:
 				cherrypy.response.status = '500 Internal Server Error'
 				return repr(ex)
-		elif cherrypy.request.json['processing'] == True:
+		elif 'processing' in json_properties and cherrypy.request.json['processing'] == True:
 			if _processor_pid() is None:
 				subprocess.Popen('/home/agbot/agbot-srvr/processor.py')
 			cherrypy.response.status = '200 OK'
-		elif cherrypy.request.json['processing'] == False:
+		elif 'processing' in json_properties and cherrypy.request.json['processing'] == False:
 			pid = _processor_pid()
 			if pid is not None:
 				# send a SIGINT to processor.py. This more or less politely asks
@@ -80,9 +81,10 @@ class Records:
 class RecordImage:
 	exposed = True
 	@cherrypy.tools.response_headers(headers = [('Content-Type','image/jpeg')])
-	def GET(self, recordID):
+	def GET(self, recordID, **params):
 		try:
-			retval, img = cv2.imencode('.jpeg', records.get_image(recordID))
+			image = records.get_image(recordID)
+			retval, img = cv2.imencode('.jpeg', image)
 			if not retval:
 				raise cherrypy.HTTPError(500, 'Internal Server Error - could not encode record %s as image'%(recordID))
 			return img

@@ -135,8 +135,9 @@ body {
     text-decoration: none; }
 
 .record-img {
-  /* TODO */
-  visibility: hidden; }
+  visibility: hidden;
+  max-width: 100%;
+  height: auto; }
 
 @media screen and (min-width: 785px) {
   #btnStatus a {
