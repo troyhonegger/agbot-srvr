@@ -4,13 +4,20 @@ var btnProcessing_Click = function() {};
 // start state: assume not processing until document loaded
 var processing = false;
 
+function updateImage() {
+    $('.record-img').src('../api/records/CURRENT');
+}
+
+var processingTimerID = null;
+
 function updateUI_processingStarted() {
     const processing_color = 'red';
     const processing_text = 'Stop';
     var btnStatus = $('#btnStatus a');
     btnStatus.css('background-color', processing_color);
-    $('.record-img'.css('visibility', 'visible'));
-    // TODO: begin timer to update image
+    $('.record-img').css('visibility', 'visible');
+    if (processingTimerID !== null) { clearInterval(processingTimerID); }
+    processingTimerID = setInterval(updateImage, 1000);
 }
 function updateUI_processingStopped() {
     const stopped_color = '#00FF00';
@@ -19,7 +26,10 @@ function updateUI_processingStopped() {
     btnStatus.text(stopped_text);
     btnStatus.css('background-color', stopped_color);
     $('.record-img').css('visibility', 'hidden');
-    // TODO: if necessary, stop timer that updates image
+    if (processingTimerID !== null) {
+        clearInterval(processingTimerID);
+        processingTimerID = null;
+    }
 }
 function updateProcessingState(var newState) {
     if (typeof(newState) === 'undefined') {
