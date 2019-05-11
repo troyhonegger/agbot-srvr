@@ -82,6 +82,7 @@ class Records:
 				raise cherrypy.HTTPError(404, 'Not Found - record %s does not exist'%(recordID))
 class RecordImage:
 	exposed = True
+	@cherrypy.expose
 	@cherrypy.tools.response_headers(headers = [('Content-Type','image/jpeg')])
 	def GET(self, recordID, **params):
 		try:
@@ -93,10 +94,20 @@ class RecordImage:
 		except FileNotFoundError:
 			raise cherrypy.HTTPError(404, 'Not Found - record %s does not exist'%(recordID))
 
+class Cameras:
+	exposed = True
+	def __init__(self):
+		pass
+	@cherrypy.expose
+	@cherrypy.tools.json_out()
+	def GET(self, **params):
+		return [] # TODO: list cameras here
+
 class API:
 	def __init__(self):
 		self.machineState = MachineState()
 		self.records = Records()
+		self.cameras = Cameras()
 
 #TODO: implement camera endpoints
 

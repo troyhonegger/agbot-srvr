@@ -124,5 +124,44 @@ body {
     width: 80%;
     border-top-left-radius: 5px;
     border-top-right-radius: 5px; } }
+#main h1 {
+  margin: 20px 0px 0px 0px; }
+
+#main hr {
+  margin: 0px;
+  background-image: linear-gradient(90deg, black, transparent);
+  height: 2px;
+  border: 0; }
+
+#cameras_table {
+  border-spacing: 0px;
+  margin: 5px 0px;
+  border-radius: 5px;
+  width: 100%;
+  padding: 0px; }
+  #cameras_table tr {
+    border-radius: 5px;
+    background-color: #fefbf4; }
+    #cameras_table tr td {
+      border: 1px solid #C28E0E;
+      margin: 0px;
+      padding: 8px; }
+      #cameras_table tr td a {
+        color: #C28E0E; }
+    #cameras_table tr td:hover {
+      background-color: #fae8bb;
+      transition-duration: 0.4s; }
+  #cameras_table tr:first-child td:first-child {
+    border-top-left-radius: 5px; }
+  #cameras_table tr:first-child td:last-child {
+    border-top-right-radius: 5px; }
+  #cameras_table tr:last-child td:first-child {
+    border-bottom-left-radius: 5px; }
+  #cameras_table tr:last-child td:last-child {
+    border-bottom-right-radius: 5px; }
+  #cameras_table tr:not(:first-child) td {
+    border-top: none; }
+  #cameras_table tr td:not(:first-child) {
+    border-left: none; }
 
 /*# sourceMappingURL=cameras.css.map */

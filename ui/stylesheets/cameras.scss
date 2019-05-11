@@ -1,1 +1,49 @@
 @import 'common';
+
+#main h1 {
+    margin: 20px 0px 0px 0px;
+}
+
+#main hr {
+    margin: 0px;
+
+    background-image: linear-gradient(90deg, black, transparent);
+    height: 2px;
+    border: 0;
+}
+
+#cameras_table {
+    border-spacing: 0px;
+    margin: 5px 0px;
+    border-radius: 5px;
+    width: 100%;
+    padding: 0px;
+
+    tr {
+        border-radius: 5px;
+        background-color: lighten($gold, 57%);
+        td {
+            border: 1px solid $gold;
+            margin: 0px;
+            padding: 8px;
+            a { color: $gold; }
+        }
+        td:hover{
+            background-color: lighten($gold, 45%);
+            transition-duration: 0.4s;
+        }
+    }
+
+    // add a border radius at each corner
+    tr:first-child {
+        td:first-child { border-top-left-radius: 5px; }
+        td:last-child { border-top-right-radius: 5px; }
+    }
+    tr:last-child {
+        td:first-child { border-bottom-left-radius: 5px; }
+        td:last-child { border-bottom-right-radius: 5px; }
+    }
+    // remove duplicated borders - left border from every column but the first, and top border from every row but the first
+    tr:not(:first-child) td { border-top: none; }
+    tr td:not(:first-child) { border-left: none; }
+}
