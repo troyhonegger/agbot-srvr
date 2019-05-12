@@ -5,6 +5,7 @@ import os
 import cv2
 import subprocess
 import signal
+import datetime
 
 import estop
 from lib import records
@@ -64,20 +65,31 @@ class Records:
 	@cherrypy.expose
 	@cherrypy.tools.response_headers(headers = [('Content-Type','application/json')])
 	@cherrypy.tools.json_out()
-	def GET(self, recordID = None):
+	def GET(self, recordID = None, **params):
 		if recordID is None:
 			return [{'recordID':recordID, 'name':name} for (recordID, name) in records.get_records()]
 		else:
 			try:
-				record = records.get_summary(recordID)
-				return {
-					'recordID': record.record_id,
-					'name': record.record_name,
-					'startTime': record.start_time.isoformat(),
-					'endTime': record.end_time.isoformat(),
-					'longitude': record.longitude,
-					'latitude': record.latitude
-				}
+				record = records.Record.read(recordID)
+				if len(record) != 0:
+					summary = record.get_summary()
+					return {
+						'recordID': summary.record_id,
+						'name': summary.record_name,
+						'startTime': summary.start_time.isoformat(),
+						'endTime': summary.end_time.isoformat(),
+						'longitude': summary.longitude,
+						'latitude': summary.latitude
+					}
+				else:
+					return {
+						'recordID': record.record_id,
+						'name': record.name,
+						'startTime': datetime.datetime.now(),
+						'endTime': datetime.datetime.now(),
+						'longitude': 0,
+						'latitude': 0
+					}
 			except FileNotFoundError:
 				raise cherrypy.HTTPError(404, 'Not Found - record %s does not exist'%(recordID))
 class RecordImage:
@@ -86,11 +98,11 @@ class RecordImage:
 	@cherrypy.tools.response_headers(headers = [('Content-Type','image/jpeg')])
 	def GET(self, recordID, **params):
 		try:
-			image = records.get_image(recordID)
-			retval, img = cv2.imencode('.jpeg', image)
+			image = records.Record.read(recordID).render()
+			retval, stream = cv2.imencode('.jpeg', image)
 			if not retval:
-				raise cherrypy.HTTPError(500, 'Internal Server Error - could not encode record %s as image'%(recordID))
-			return img
+				raise cherrypy.HTTPError(500, 'Internal Server Error - could not encode record %s as a JPEG image'%(recordID))
+			return stream
 		except FileNotFoundError:
 			raise cherrypy.HTTPError(404, 'Not Found - record %s does not exist'%(recordID))
 
@@ -103,13 +115,13 @@ class Cameras:
 	def GET(self, **params):
 		return [] # TODO: list cameras here
 
+#TODO: anything else necessary server-side for the camera endpoints
+
 class API:
 	def __init__(self):
 		self.machineState = MachineState()
 		self.records = Records()
 		self.cameras = Cameras()
-
-#TODO: implement camera endpoints
 
 if __name__ == '__main__':
 	path = os.path.dirname(os.path.abspath(__file__))

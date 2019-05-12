@@ -15,7 +15,9 @@ CURRENT = 'CURRENT'
 
 MAX_IMG_WIDTH = 1500
 MAX_IMG_HEIGHT = 700
-
+PLANT_RADIUS_FT = 2 / 12 # TODO: adjust as needed. This is 4 inches/plant
+# distances from the given row to the center of the BOT.
+ROW_DIST = [-1.5,-1.0,0.0,1.0,1.5] # TODO: adjust as needed
 
 def get_name(record_id):
 	# for now, names and record IDs are synonymous
@@ -24,12 +26,6 @@ def get_name(record_id):
 def get_records():
 	files = [file[:-len(EXT)] for file in os.listdir(DIR) if os.path.isfile(file) and file.endswith(EXT)]
 	return [(record_id, get_name(record_id)) for record_id in files]
-
-def get_image(record_id):
-	return Record.read(record_id).render()
-
-def get_summary(record_id):
-	return Record.read(record_id).get_summary()
 
 def _vec(*components):
 	return numpy.array(components, numpy.float64)
@@ -74,6 +70,23 @@ def _coordinate_vectors(x0, y0, z0):
 # RecordLine text format: [ISO Local Time] [latitude] [longitude] [plants]
 # [plants] is a comma-delimited list of Plants objects (which are themselves pipe-delimited).
 # Each entry in the list corresponds to a row, and the rows are listed left to right.
+def _img_compute_scale(width_ft, height_ft):
+	if width_ft == 0 and height_ft == 0:
+		raise ValueError('Cannot compute scale: area given is infinitesimal')
+	elif width_ft == 0:
+		return MAX_IMG_HEIGHT / height_ft
+	elif height_ft == 0:
+		return MAX_IMG_WIDTH / width_ft
+	else:
+		min(MAX_IMG_WIDTH / width_ft, MAX_IMG_HEIGHT / height_ft)
+def get_color(plant):
+	pass #TODO
+def _draw_record_line(img, record_line, posn_px, normal_ft, scale, plant_radius_px):
+	for row_offs, row in zip(ROW_DIST, record_line.rowdata):
+		center = posn_px + scale * row_offs * normal_ft # find the center of any weeds found in that row
+		for plant in row:
+			cv2.circle(img, (int(center[0]), int(center[1])), plant_radius_px, get_color(plant), -1)
+
 class RecordLine:
 	@classmethod
 	def read(cls, string):
@@ -122,31 +135,44 @@ class Record:
 			print(str(line), file)
 		file.flush()
 	def render(self):
-		self.get_summary()
-		center = _to_cartesian(self.summary.longitude, self.summary.latitude)
-		north_vec, east_vec = _coordinate_vectors(center[0], center[1], center[2])
-		rel_posns = numpy.array(_to_cartesian(record.longitude, record.latitude) - center for record in self)
-		rel_north = numpy.array(_dotprod(north_vec, rel_posn) for rel_posn in rel_posns)
-		rel_east = numpy.array(_dotprod(east_vec, rel_posn) for rel_posn in rel_posns)
-		furthest_east = numpy.max(rel_east)
-		furthest_north = numpy.max(rel_north)
-		furthest_west = numpy.min(rel_east)
-		furthest_south = numpy.min(rel_north)
-		width_ft, height_ft = furthest_east - furthest_west, furthest_north - furthest_south
-		# compute scale (in pixels per foot)
-		if width_ft == 0 and height_ft == 0:
-			scale = 0 # TODO
-			raise NotImplementedError()
-		elif width_ft == 0:
-			scale = MAX_IMG_HEIGHT / height_ft
-		elif height_ft == 0:
-			scale = MAX_IMG_WIDTH / width_ft
+		if len(self) == 0:
+			img = numpy.full((MAX_IMG_HEIGHT, MAX_IMG_WIDTH, 3), 255, numpy.uint8)
+			# TODO: if we want to draw a little AgBot picture in the middle, do that here
+			return img
 		else:
-			scale = min(MAX_IMG_WIDTH / width_ft, MAX_IMG_HEIGHT / height_ft)
-		width_px, height_px = math.floor(width_ft * scale), math.floor(height_ft * scale)
-		img = numpy.full((height_px, width_px, 3), 255, numpy.uint8)
-		for record in self:
-			pass # TODO
+			self.get_summary()
+			center = _to_cartesian(self.summary.longitude, self.summary.latitude)
+			north_vec, east_vec = _coordinate_vectors(center[0], center[1], center[2])
+			rel_posns = numpy.array(_to_cartesian(record.longitude, record.latitude) - center for record in self)
+			rel_north = numpy.array(_dotprod(north_vec, rel_posn) for rel_posn in rel_posns)
+			rel_east = numpy.array(_dotprod(east_vec, rel_posn) for rel_posn in rel_posns)
+			max_row_dist = ROW_DIST[-1]
+			# scale to account for width of the bot
+			furthest_east = numpy.max(rel_east) + max_row_dist
+			furthest_north = numpy.max(rel_north) + max_row_dist
+			furthest_west = numpy.min(rel_east) - max_row_dist
+			furthest_south = numpy.min(rel_north) - max_row_dist
+			width_ft, height_ft = furthest_east - furthest_west, furthest_north - furthest_south
+			scale = _img_compute_scale(width_ft, height_ft)
+			width_px, height_px = math.floor(width_ft * scale), math.floor(height_ft * scale)
+			img = numpy.full((height_px, width_px, 3), 255, numpy.uint8)
+			plant_radius_px = math.ceil(scale * PLANT_RADIUS_FT) # radius >= 1 - always draw at least 1px
+			def _posn_ft(i):
+				return _vec(rel_north[i], rel_east[i])
+			def _posn_px(i):
+				posn_ft = _posn_ft(i)
+				return _vec(int(scale * (posn_ft[0]) + furthest_north), int(scale * (posn_ft[1] + furthest_east)))
+			if len(self) == 1:
+				_draw_record_line(img, self.lines[0], _posn_ft(0), _vec(0,0), scale, plant_radius_px)
+			else:
+				for i in range(len(self)):
+					posn_ft = _posn_ft(i)
+					velocity_ft = posn_ft - _posn_ft(i - 1) if i != 0 else _posn_ft(i + 1) - posn_ft
+					# compute a vector normal to the direction of travel, pointing right
+					normal_ft = _hat(_vec(velocity_ft[1], velocity_ft[0])) if (velocity_ft[0] != 0 or velocity_ft[1] != 0) else _vec(0, 0)
+					_draw_record_line(img, self.lines[i], _posn_px(i), normal_ft, scale, plant_radius_px)
+			# TODO: if we want to draw a little AgBot picture in the last position, do that here
+			return img
 	def get_summary(self):
 		if self.summary is None:
 			if len(self) == 0:
