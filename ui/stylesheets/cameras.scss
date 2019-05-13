@@ -17,16 +17,25 @@
     margin: 5px 0px;
     border-radius: 5px;
     width: 100%;
+    max-width: 100%;
     padding: 0px;
+    table-layout: fixed;
+    word-wrap: break-word;
 
     tr {
         border-radius: 5px;
         background-color: lighten($gold, 57%);
+        th {
+            border: 1px solid $gold;
+            margin: 0px;
+            padding: 8px;
+            color: $gold;
+        }
         td {
             border: 1px solid $gold;
             margin: 0px;
             padding: 8px;
-            a { color: $gold; }
+            color: $gold;
         }
         td:hover{
             background-color: lighten($gold, 45%);
@@ -36,14 +45,20 @@
 
     // add a border radius at each corner
     tr:first-child {
+        th:first-child { border-top-left-radius: 5px; }
+        th:last-child { border-top-right-radius: 5px; }
         td:first-child { border-top-left-radius: 5px; }
         td:last-child { border-top-right-radius: 5px; }
     }
     tr:last-child {
+        th:first-child { border-bottom-left-radius: 5px; }
+        th:last-child { border-bottom-right-radius: 5px; }
         td:first-child { border-bottom-left-radius: 5px; }
         td:last-child { border-bottom-right-radius: 5px; }
     }
     // remove duplicated borders - left border from every column but the first, and top border from every row but the first
     tr:not(:first-child) td { border-top: none; }
+    tr:not(:first-child) th { border-top: none; }
     tr td:not(:first-child) { border-left: none; }
+    tr th:not(:first-child) { border-left: none; }
 }

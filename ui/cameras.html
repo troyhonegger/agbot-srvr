@@ -4,9 +4,6 @@
         <title>agBOT Live Camera Feed</title>
         <link rel="icon" href="logo.ico">
 		<link rel="stylesheet" type="text/css" href="stylesheets/cameras.css">
-		<script type="text/javascript" src="scripts/jquery.js" defer></script>
-		<script type="text/javascript" src="scripts/common.js" defer></script>
-		<script type="text/javascript" src="scripts/cameras.js" defer></script>
 	</head>
 	<body>
 		<div id="header">
@@ -36,11 +33,27 @@
             <h1>Cameras</h1>
             <hr>
             <p>View live video feeds and monitor the bot in real time</p>
+            <p>To start, copy the "video feed" link into VLC Viewer.</p>
 
-            <!--JavaScript will display this once it's ready to display records-->
-            <table id="cameras_table" style="visibility: collapse"></table>
-            <!--JavaScript will hide this once it's ready to display records-->
-            <p id="cameras_notfound" style="visibility: visible"> Sorry, we couldn't find any cameras connected. </p>
+            <table id="cameras_table" style="visibility: visible">
+                <tr>
+                    <th>Camera Name</th>
+                    <th>Video Feed</th>
+                </tr>
+                <tr>
+                    <td>Driver's Seat</td>
+                    <td class="camera_link">rtsp://appagent:streaming@192.168.1.50:554/videoMain</td>
+                </tr>
+                <tr>
+                    <td>Rear-facing</td>
+                    <td class="camera_link">rtsp://appagent:streaming@192.168.1.51:554/videoMain</td>
+                </tr>
+                <tr>
+                    <!--TODO: name this camera-->
+                    <td>???</td>
+                    <td class="camera_link">rtsp://appagent:streaming@192.168.1.52:554/videoMain</td>
+                </tr>
+            </table>
         </div>
         
         <div id="footer">
