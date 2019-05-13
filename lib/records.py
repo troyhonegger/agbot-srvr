@@ -1,6 +1,4 @@
 import os
-import stat
-import sys
 import cv2
 import datetime
 import numpy
@@ -13,8 +11,8 @@ DIR = '/home/agbot/agbot-srvr/records'
 EXT = '.rec'
 CURRENT = 'CURRENT'
 
-MAX_IMG_WIDTH = 1500
-MAX_IMG_HEIGHT = 700
+MAX_IMG_WIDTH = 700
+MAX_IMG_HEIGHT = 500
 PLANT_RADIUS_FT = 2 / 12 # TODO: adjust as needed. This is 4 inches/plant
 # distances from the given row to the center of the BOT.
 ROW_DIST = [-1.5,-1.0,0.0,1.0,1.5] # TODO: adjust as needed
@@ -24,7 +22,7 @@ def get_name(record_id):
 	return record_id
 
 def get_records():
-	files = [file[:-len(EXT)] for file in os.listdir(DIR) if os.path.isfile(file) and file.endswith(EXT)]
+	files = [file[:-len(EXT)] for file in os.listdir(DIR) if os.path.isfile(os.path.join(DIR, file)) and file.endswith(EXT)]
 	return [(record_id, get_name(record_id)) for record_id in files]
 
 def _vec(*components):
@@ -42,7 +40,7 @@ def _to_cartesian(longitude, latitude):
 	theta = math.radians(latitude)
 	phi = math.radians(90 - longitude)
 	xy_radius = math.sin(phi) * EARTH_RADIUS
-	return _vec([xy_radius * math.cos(theta), xy_radius * math.sin(theta), EARTH_RADIUS * math.cos(phi)])
+	return _vec(xy_radius * math.cos(theta), xy_radius * math.sin(theta), EARTH_RADIUS * math.cos(phi))
 def _coordinate_vectors(x0, y0, z0):
 	"""Returns two vectors - one pointing North in three dimensions (relative to the current position)
 	and one pointing East in three dimensions (relative to the current position)"""
@@ -78,13 +76,23 @@ def _img_compute_scale(width_ft, height_ft):
 	elif height_ft == 0:
 		return MAX_IMG_WIDTH / width_ft
 	else:
-		min(MAX_IMG_WIDTH / width_ft, MAX_IMG_HEIGHT / height_ft)
+		return min(MAX_IMG_WIDTH / width_ft, MAX_IMG_HEIGHT / height_ft)
 def get_color(plant):
-	pass #TODO
+	if plants.Plants.Foxtail in plant:
+		return (0, 0, 255) #red
+	elif plants.Plants.Corn in plant:
+		return (0, 255, 0) #green
+	elif plants.Plants.Cocklebur in plant:
+		return (0, 255, 246) #yellow
+	elif plants.Plants.Ragweed in plant:
+		return (255, 0, 0) #blue
 def _draw_record_line(img, record_line, posn_px, normal_ft, scale, plant_radius_px):
 	for row_offs, row in zip(ROW_DIST, record_line.rowdata):
 		center = posn_px + scale * row_offs * normal_ft # find the center of any weeds found in that row
 		for plant in row:
+			# debug only
+			#print('drawing circle at (%d,%d), radius %d, color (%d %d %d)'\
+			#	%(int(center[0]), int(center[1]), plant_radius_px, get_color(plant)[0], get_color(plant)[1], get_color(plant)[2]))
 			cv2.circle(img, (int(center[0]), int(center[1])), plant_radius_px, get_color(plant), -1)
 
 class RecordLine:
@@ -114,17 +122,18 @@ class RecordSummary:
 class Record:
 	@classmethod
 	def read(cls, record_id):
-		path = '%s.%s'%(record_id, EXT)
+		path = record_id + EXT
 		if not path in os.listdir(DIR):
 			raise FileNotFoundError('%s is not a valid record file'%(record_id))
 		record = Record(record_id, get_name(record_id))
-		with open(DIR + path) as file:
+		with open(os.path.join(DIR, path)) as file:
 			for line in file:
-				record.lines.append(RecordLine.read(line.trim()))
+				record.lines.append(RecordLine.read(line.strip()))
 		return record
 	def __init__(self, record_id, name):
 		self.record_id = record_id
 		self.name = name
+		self.summary = None
 		self.lines = []
 	def __iter__(self):
 		return self.lines.__iter__()
@@ -143,9 +152,9 @@ class Record:
 			self.get_summary()
 			center = _to_cartesian(self.summary.longitude, self.summary.latitude)
 			north_vec, east_vec = _coordinate_vectors(center[0], center[1], center[2])
-			rel_posns = numpy.array(_to_cartesian(record.longitude, record.latitude) - center for record in self)
-			rel_north = numpy.array(_dotprod(north_vec, rel_posn) for rel_posn in rel_posns)
-			rel_east = numpy.array(_dotprod(east_vec, rel_posn) for rel_posn in rel_posns)
+			rel_posns = [_to_cartesian(record.longitude, record.latitude) - center for record in self]
+			rel_north = [_dotprod(north_vec, rel_posn) for rel_posn in rel_posns]
+			rel_east = [_dotprod(east_vec, rel_posn) for rel_posn in rel_posns]
 			max_row_dist = ROW_DIST[-1]
 			# scale to account for width of the bot
 			furthest_east = numpy.max(rel_east) + max_row_dist
@@ -161,7 +170,7 @@ class Record:
 				return _vec(rel_north[i], rel_east[i])
 			def _posn_px(i):
 				posn_ft = _posn_ft(i)
-				return _vec(int(scale * (posn_ft[0]) + furthest_north), int(scale * (posn_ft[1] + furthest_east)))
+				return _vec(int(scale * (posn_ft[0] + furthest_north)), int(scale * (posn_ft[1] + furthest_east)))
 			if len(self) == 1:
 				_draw_record_line(img, self.lines[0], _posn_ft(0), _vec(0,0), scale, plant_radius_px)
 			else:
@@ -178,9 +187,9 @@ class Record:
 			if len(self) == 0:
 				raise ValueError('Cannot compute summary of an empty record')
 			avg_latitude = sum(record.latitude for record in self) / len(self)
-			longitudes1 = numpy.array((record.longitude for record in self), numpy.float64)
-			longitudes2 = numpy.array((record.longitude if record.longitude < 180.0 else record.longitude - 360.0 \
-									for record in self), numpy.float64)
+			longitudes1 = numpy.array([record.longitude for record in self], numpy.float64)
+			longitudes2 = numpy.array([record.longitude if record.longitude < 180.0 else record.longitude - 360.0 \
+									for record in self], numpy.float64)
 			avg_longitude = numpy.average(longitudes2) \
 							if numpy.std(longitudes2) < numpy.std(longitudes1) \
 							else numpy.average(longitudes1)
