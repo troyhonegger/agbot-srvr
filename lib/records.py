@@ -13,9 +13,9 @@ CURRENT = 'CURRENT'
 
 MAX_IMG_WIDTH = 700
 MAX_IMG_HEIGHT = 500
-PLANT_RADIUS_FT = 2 / 12 # TODO: adjust as needed. This is 4 inches/plant
-# distances from the given row to the center of the BOT.
-ROW_DIST = [-1.5,-1.0,0.0,1.0,1.5] # TODO: adjust as needed
+PLANT_RADIUS_FT = 2 / 12 # TODO: adjust as needed. This is 4 inches diameter for one plant
+# distances from each row to the center of the BOT.
+ROW_DIST = [-26/12, -16/12, 0.0, 16/12, 26/12]
 
 def get_name(record_id):
 	# for now, names and record IDs are synonymous

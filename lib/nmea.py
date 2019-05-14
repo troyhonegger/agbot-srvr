@@ -84,13 +84,22 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-p', '--port', default = '/dev/ttyS0', required = False, help = 'The serial port on which to listen. The default is /dev/ttyS0')
 	parser.add_argument('-t', '--ignore-turn', action = 'store_true', help = 'Use this flag to suppress end-of-row detection')
+	parser.add_argument('-b', '--baud-rate', default=38400, type=int, choices = [4800, 9600, 19200, 38400, 57600, 115200], help = 'The serial baud rate. The default is 38400.')
 	args = parser.parse_args()
 	from lib import loghelper
 	log = loghelper.get_logger(__file__)
-	log.info('Starting up NMEA listener on serial port %s...', args.port)
+	log.info('Starting up NMEA listener on serial port %s. Baud rate = %d', args.port, args.baud_rate)
+	try:
+		subprocess.run('stty -F %s %d'%(args.port, args.baud_rate), check=True)
+	except subprocess.CalledProcessError as ex:
+		log.error('Could not set baud rate - %s', repr(ex))
+		raise
 	try:
 		for type in _files:
-			_files[type] = open(os.path.join(DIR, type + '.txt'), 'w+')
+			path = os.path.join(DIR, type + '.txt')
+			_files[type] = open(path, 'w+')
+			# This script will run as root, so this should make sure everyone else permission to read the files we create
+			os.chmod(path, 0o644)
 		with open(args.port, 'r') as nmea_port:
 			if not args.ignore_turn:
 				was_turning = None
@@ -122,6 +131,7 @@ if __name__ == '__main__':
 					log.error("Could not parse NMEA message: '%s'. Skipping this message...", line.strip())
 	except UnicodeDecodeError: # this happens in the serial port's iterator if the baud rate is incorrect
 		log.error("Cannot read NMEA data - baud rate is incorrect. Exiting...")
+		raise
 	except KeyboardInterrupt:
 		pass # suppress exception, but exit gracefully through finally
 	finally:
