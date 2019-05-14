@@ -3,7 +3,6 @@
 import pynmea2
 import subprocess
 import datetime
-
 DIR = '/home/agbot/nmea'
 
 # The Trimble supports the following messages:
@@ -130,4 +129,7 @@ if __name__ == '__main__':
 		close()
 		# delete all the files, so the next person to call read_data hits an error instead of reading stale data
 		for type in _files:
-			os.remove(os.path.join(DIR, type + '.txt'))
+			try:
+				os.remove(os.path.join(DIR, type + '.txt'))
+			except OSError:
+				pass # oh well - we tried. Probably this just means the file didn't exist
