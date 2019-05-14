@@ -35,24 +35,30 @@ def _processor_pid():
 # TODO: fine tune through testing
 _MAX_EOR_INTERVAL = 2.0 # only remember velocity data from the last two seconds
 _MIN_EOR_INTERVAL = 0.5 # if we only have data from the past 0.5 seconds, discard the result as too noisy
+_MIN_SPD_KPH = 0.5 # discard any readings with speed less than 0.5 kph (approx 0.45 fps) (prevents noise when the BOT is not moving and the heading is unreliable) 
 _TURN_SPEED_CUTOFF = 5.0 # if we average 5 degrees/sec for 2 seconds, assume we're turning
+_TURN_DEBOUNCE_TIME = 2.0 # prevent turning/not turning signals from being generated twice inside 2 seconds
 _vtg_history = []
 
 def is_turning(vtg_msg):
-	# remove queue elements older than _EOR_INTERVAL seconds old
 	now = datetime.datetime.now()
+	if vtg_msg.spd_over_grnd_kmph >= _MIN_SPD_KPH:  
+		_vtg_history.append((now, vtg_msg))
+	# remove queue elements older than _EOR_INTERVAL seconds old
 	for date, msg in _vtg_history:
 		if (now - date).total_seconds() >= _MAX_EOR_INTERVAL:
 			_vtg_history.remove((date,msg))
 	# add current element to history
 	_vtg_history.append((now, vtg_msg))
+	if len(_vtg_history) < 2: return None # insufficient data: we don't know if we're turning
 	# compute change in heading (dh) / change in time (dt)
 	time0, msg0 = _vtg_history[0]
-	dt = (now - time0).total_seconds()
-	if dt < _MIN_EOR_INTERVAL: return None # we don't know if we're turning
-	dh = vtg_msg.true_track - msg0.true_track
+	time1, msg1 = _vtg_history[-1]
+	dt = (time1 - time0).total_seconds()
+	if dt < _MIN_EOR_INTERVAL: return None # insufficient data: we don't know if we're turning
+	dh = msg1.true_track - msg0.true_track
 	abs_dh = min(abs(dh), abs(dh - 360.0))
-	return dt != 0 and abs_dh/dt > _TURN_SPEED_CUTOFF
+	return abs_dh/dt > _TURN_SPEED_CUTOFF
 
 def read_data(type):
 	global _files
@@ -103,6 +109,7 @@ if __name__ == '__main__':
 		with open(args.port, 'r') as nmea_port:
 			if not args.ignore_turn:
 				was_turning = None
+				turning_last_edge = None
 			# clear out and discard the first line - it is probably garbage
 			try:
 				for line in nmea_port:
@@ -123,8 +130,10 @@ if __name__ == '__main__':
 						_files[type].seek(0)
 						if type == VTG and not args.ignore_turn:
 							turning = is_turning(data)
-							if turning is not None and turning != was_turning:
+							if turning is not None and turning != was_turning and \
+									(was_turning is None or (datetime.datetime.now() - turning_last_edge).total_seconds() >= _TURN_DEBOUNCE_TIME):
 								was_turning = turning
+								turning_last_edge = datetime.datetime.now()
 								pid = _processor_pid()
 								if pid is not None:
 									os.kill(pid, signal.SIGUSR2 if turning else signal.SIGUSR1)
