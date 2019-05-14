@@ -90,7 +90,7 @@ if __name__ == '__main__':
 	log = loghelper.get_logger(__file__)
 	log.info('Starting up NMEA listener on serial port %s. Baud rate = %d', args.port, args.baud_rate)
 	try:
-		subprocess.run('stty -F %s %d'%(args.port, args.baud_rate), check=True)
+		subprocess.run(['stty', '-F', args.port, str(args.baud_rate)], check=True)
 	except subprocess.CalledProcessError as ex:
 		log.error('Could not set baud rate - %s', repr(ex))
 		raise
@@ -103,6 +103,12 @@ if __name__ == '__main__':
 		with open(args.port, 'r') as nmea_port:
 			if not args.ignore_turn:
 				was_turning = None
+			# clear out and discard the first line - it is probably garbage
+			try:
+				for line in nmea_port:
+					break
+			except UnicodeDecodeError:
+				pass
 			for line in nmea_port:
 				try:
 					line = line.strip()
@@ -118,7 +124,6 @@ if __name__ == '__main__':
 						if type == VTG and not args.ignore_turn:
 							turning = is_turning(data)
 							if turning is not None and turning != was_turning:
-								print(turning)
 								was_turning = turning
 								pid = _processor_pid()
 								if pid is not None:
