@@ -12,6 +12,7 @@ GSA = 'GSA' # dilution of precision
 GST = 'GST' # position error
 VTG = 'VTG' # ground speed
 ZDA = 'ZDA' # date and time
+RMC = 'RMC' # position, velocity, time
 
 # We support all of them for completeness, though we will most likely only use GGA
 
@@ -21,6 +22,7 @@ _files = {
 	GST: None,
 	VTG: None,
 	ZDA: None,
+	RMC: None,
 }
 
 def _processor_pid():
@@ -32,22 +34,22 @@ def _processor_pid():
 		return None
 
 # TODO: fine tune through testing
-_MAX_EOR_INTERVAL = 3.0 # only remember velocity data from the last three seconds
-_MIN_EOR_INTERVAL = 1.0 # if we only have data from the past 1.0 seconds, discard the result as too noisy
-_TURN_SPEED_CUTOFF = 5.0 # if we average 5 degrees/sec for 3 seconds, assume we're turning
+_MAX_EOR_INTERVAL = 2.0 # only remember velocity data from the last two seconds
+_MIN_EOR_INTERVAL = 0.5 # if we only have data from the past 0.5 seconds, discard the result as too noisy
+_TURN_SPEED_CUTOFF = 5.0 # if we average 5 degrees/sec for 2 seconds, assume we're turning
 _vtg_history = []
 
 def is_turning(vtg_msg):
 	# remove queue elements older than _EOR_INTERVAL seconds old
 	now = datetime.datetime.now()
 	for date, msg in _vtg_history:
-		if (date - now).total_seconds() >= _MAX_EOR_INTERVAL:
+		if (now - date).total_seconds() >= _MAX_EOR_INTERVAL:
 			_vtg_history.remove((date,msg))
 	# add current element to history
 	_vtg_history.append((now, vtg_msg))
 	# compute change in heading (dh) / change in time (dt)
 	time0, msg0 = _vtg_history[0]
-	dt = (now - time0).total_seconds
+	dt = (now - time0).total_seconds()
 	if dt < _MIN_EOR_INTERVAL: return None # we don't know if we're turning
 	dh = vtg_msg.true_track - msg0.true_track
 	abs_dh = min(abs(dh), abs(dh - 360.0))
@@ -55,7 +57,7 @@ def is_turning(vtg_msg):
 
 def read_data(type):
 	global _files
-	if type not in _files.keys:
+	if type not in _files.keys():
 		raise ValueError("Unsupported message type: '%s'"%(type))
 	if _files[type] is None:
 		path = os.path.join(DIR, type + '.txt')
@@ -89,15 +91,17 @@ if __name__ == '__main__':
 	log.info('Starting up NMEA listener on serial port %s...', args.port)
 	try:
 		for type in _files:
-			_files[type] = open(os.path.join(DIR, type + '.txt'), 'w')
+			_files[type] = open(os.path.join(DIR, type + '.txt'), 'w+')
 		with open(args.port, 'r') as nmea_port:
 			if not args.ignore_turn:
 				was_turning = None
 			for line in nmea_port:
 				try:
-					data = pynmea2.parse(line.strip())
+					line = line.strip()
+					if len(line) == 0: continue # skip blank lines
+					data = pynmea2.parse(line)
 					type = data.__class__.__name__
-					if type in _files.keys:
+					if type in _files.keys():
 						# use os.write() to auto-synchronize things for us. This makes all writes (effectively) atomic
 						os.write(_files[type].fileno(), (str(data) + '\n').encode('utf-8'))
 						# NOTE: if a longer message is followed by a shorter one, this will leave garbage left over after the first line.
@@ -106,6 +110,7 @@ if __name__ == '__main__':
 						if type == VTG and not args.ignore_turn:
 							turning = is_turning(data)
 							if turning is not None and turning != was_turning:
+								print(turning)
 								was_turning = turning
 								pid = _processor_pid()
 								if pid is not None:
@@ -114,7 +119,14 @@ if __name__ == '__main__':
 						log.warning('Received unrecognized message type %s', type)
 				except pynmea2.ChecksumError:
 					log.error("Invalid NMEA checksum on the following message: '%s'. Skipping this message...", line.strip())
+				except pynmea2.ParseError:
+					log.error("Could not parse NMEA message: '%s'. Skipping this message...", line.strip())
+	except UnicodeDecodeError: # this happens in the serial port's iterator if the baud rate is incorrect
+		log.error("Cannot read NMEA data - baud rate is incorrect. Exiting...")
+	except KeyboardInterrupt:
+		pass # suppress exception, but exit gracefully through finally
 	finally:
+		log.info('Shutting down NMEA service')
 		close()
 		# delete all the files, so the next person to call read_data hits an error instead of reading stale data
 		for type in _files:
