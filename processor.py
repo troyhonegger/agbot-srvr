@@ -169,14 +169,16 @@ def process_rowctrl():
 	elif row_state == END_OF_ROW:
 		log.info('End of row reached')
 		if mult is not None:
-			mult.process_lower_hitch()
+			mult.process_raise_hitch()
 		if speed_controller is not None:
 			speed_controller.exit_row()
 		row_state = TURNING
 
 def process(threshold, ignore_nmea = False, diagcam_id = None):
+	global row_state
 	process_rowctrl()
-	process_detector(threshold, ignore_nmea, diagcam_id)
+	if row_state == IN_ROW:
+		process_detector(threshold, ignore_nmea, diagcam_id)
 
 def stop_processor():
 	log.info('Shutting down processor...')
