@@ -134,19 +134,23 @@ def process_detector(threshold, ignore_nmea = False, diagcam_id = None):
 		else:
 			cams_history[i] = True
 		#t0 = time.time()
+		results_temp = [plants.Plants.NONE] * len(results)
 		for (cls, confidence, (x, y, w, h)) in darknet_wrapper.detect_cv2(net, meta, image, thresh = threshold):
 			cls = cls.decode('latin-1')
 			#print('Found %s in %s'%(cls, camera.id))
 			if draw_bbox:
 				_draw_bbox(image, cls, x, y, w, h)
 			if cls in plants_map.keys():
-				results[map_location(camera.id, x, y)] |= plants_map[cls]
+				results_temp[map_location(camera.id, x, y)] |= plants_map[cls]
 		#print('ran detection in %fsec'%(time.time() - t0))
+		if mult is not None: # send the results for each camera individually, to make things more responsive
+			mult.send_process_message(results_temp);
+		# store results_temp to results
+		for i in range(len(results)):
+			results[i] |= results_temp[i]
 		if draw_bbox:
 			cv2.imshow(diagcam_id, image)
 			cv2.waitKey(1)
-	if mult is not None:
-		mult.send_process_message(results)
 	if not ignore_nmea:
 		gga = nmea.read_data(nmea.GGA)
 		record = records.RecordLine(datetime.datetime.now(), gga.longitude, gga.latitude, results)
