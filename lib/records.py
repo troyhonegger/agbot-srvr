@@ -107,8 +107,11 @@ class RecordLine:
 		self.longitude = longitude
 		self.latitude = latitude
 		self.rowdata = rows
+	def __repr__(self):
+		return 'RecordLine(timestamp=%s; longitude=%f; latitude=%f; rows=%s)'% \
+			(repr(self.timestamp), self.longitude, self.latitude, ', '.join([str(row) for row in self.rowdata]))
 	def __str__(self):
-		return '%s %f %f %s'%(self.timestamp.isoformat(), self.longitude, self.latitude, ', '.join([str(row) for row in self.rows]))
+		return '%s %f %f %s'%(self.timestamp.isoformat(), self.longitude, self.latitude, ', '.join([str(row) for row in self.rowdata]))
 
 class RecordSummary:
 	def __init__(self, record_id, record_name, start_time, end_time, latitude, longitude):
@@ -118,6 +121,11 @@ class RecordSummary:
 		self.end_time = end_time
 		self.longitude = longitude
 		self.latitude = latitude
+	def __repr__(self):
+		return 'RecordSummary(record_id=%s, record_name=%s, start_time=%s, end_time=%s, longitude=%f, latitude=%f)'%\
+			(self.record_id, self.record_name, str(self.start_time), str(self.end_time), self.longitude, self.latitude)
+	def __str__(self):
+		return "Record '%s': started %s, long/lat = (%f, %f)"%(self.record_name, str(self.start_time), self.longitude, self.latitude)
 
 class Record:
 	@classmethod
@@ -199,3 +207,7 @@ class Record:
 				max(record.timestamp for record in self), \
 				avg_latitude, avg_longitude)
 		return self.summary
+	def __str__(self):
+		return "Record '%s' (%d lines)"%(self.name, len(self))
+	def __repr__(self):
+		return 'Record(record_id=%s, name=%s, len=%d'%(self.record_id, self.name, len(self))
