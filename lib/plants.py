@@ -2,10 +2,10 @@ import enum
 
 class Plants(enum.IntFlag):
 	NONE = 0
-	Foxtail = 1
+	Corn = 1
 	Cocklebur = 2
 	Ragweed = 4
-	Corn = 8
+	Foxtail = 8
 	@classmethod
 	def deserialize(cls, string):
 		#the optional prefix 'Plants.' is accepted, but not necessary
