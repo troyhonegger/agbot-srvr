@@ -5,7 +5,7 @@ import json
 import time
 import re
 
-DEFAULT_IP = '10.0.0.2'
+DEFAULT_IP = '192.168.4.2'
 DEFAULT_PORT = 8010
 DEFAULT_TIMEOUT = 0.2
 MAX_MESSAGE_SIZE = 63
