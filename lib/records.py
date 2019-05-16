@@ -37,8 +37,8 @@ def _dotprod(v1, v2):
 	return sum([x*y for x,y in zip(v1, v2)])
 EARTH_RADIUS = 20_902_464 # feet
 def _to_cartesian(longitude, latitude):
-	theta = math.radians(latitude)
-	phi = math.radians(90 - longitude)
+	theta = math.radians(longitude)
+	phi = math.radians(90 - latitude)
 	xy_radius = math.sin(phi) * EARTH_RADIUS
 	return _vec(xy_radius * math.cos(theta), xy_radius * math.sin(theta), EARTH_RADIUS * math.cos(phi))
 def _coordinate_vectors(x0, y0, z0):
@@ -59,7 +59,7 @@ def _coordinate_vectors(x0, y0, z0):
 		dx, dy = -x0/z0, -y0/z0
 		# distortions will also start to occur very close to the north pole, where the gradient approaches zero and
 		# "north" becomes less meaningful. Not that it matters, of course, for our purposes
-		north = _hat(_vec(dx * dx + dy * dy, dx, dy))
+		north = _hat(_vec(dx, dy, dx * dx + dy * dy))
 	# This is perpendicular to both north and the normal vector, so it must point either east or west. Right-hand
 	# rule experimentation shows this is the way that points east.
 	east = _hat(_crossprod(north, _vec(x0, y0, z0)))
@@ -153,7 +153,7 @@ class Record:
 		file.flush()
 	def render(self):
 		if len(self) == 0:
-			img = numpy.full((MAX_IMG_HEIGHT, MAX_IMG_WIDTH, 3), 255, numpy.uint8)
+			img = numpy.full((MAX_IMG_HEIGHT, MAX_IMG_WIDTH, 3), 200, numpy.uint8)
 			# TODO: if we want to draw a little AgBot picture in the middle, do that here
 			return img
 		else:
@@ -163,27 +163,29 @@ class Record:
 			rel_posns = [_to_cartesian(record.longitude, record.latitude) - center for record in self]
 			rel_north = [_dotprod(north_vec, rel_posn) for rel_posn in rel_posns]
 			rel_east = [_dotprod(east_vec, rel_posn) for rel_posn in rel_posns]
-			max_row_dist = ROW_DIST[-1]
-			# scale to account for width of the bot
-			furthest_east = numpy.max(rel_east) + max_row_dist
-			furthest_north = numpy.max(rel_north) + max_row_dist
-			furthest_west = numpy.min(rel_east) - max_row_dist
-			furthest_south = numpy.min(rel_north) - max_row_dist
+			# add a margin to account for width of the BOT
+			margin = ROW_DIST[-1] + PLANT_RADIUS_FT + 3
+			furthest_east = numpy.max(rel_east) + margin
+			furthest_north = numpy.max(rel_north) + margin
+			furthest_west = numpy.min(rel_east) - margin
+			furthest_south = numpy.min(rel_north) - margin
 			width_ft, height_ft = furthest_east - furthest_west, furthest_north - furthest_south
 			scale = _img_compute_scale(width_ft, height_ft)
 			width_px, height_px = math.floor(width_ft * scale), math.floor(height_ft * scale)
-			img = numpy.full((height_px, width_px, 3), 255, numpy.uint8)
+			img = numpy.full((height_px, width_px, 3), 200, numpy.uint8)
 			plant_radius_px = math.ceil(scale * PLANT_RADIUS_FT) # radius >= 1 - always draw at least 1px
 			def _posn_ft(i):
-				return _vec(rel_north[i], rel_east[i])
+				return _vec(rel_east[i], rel_north[i])
 			def _posn_px(i):
 				posn_ft = _posn_ft(i)
-				return _vec(int(scale * (posn_ft[0] + furthest_north)), int(scale * (posn_ft[1] + furthest_east)))
+				return _vec(int(scale * (posn_ft[0] - furthest_west)), int(scale * (furthest_north - posn_ft[1])))
 			if len(self) == 1:
 				_draw_record_line(img, self.lines[0], _posn_ft(0), _vec(0,0), scale, plant_radius_px)
 			else:
 				for i in range(len(self)):
 					posn_ft = _posn_ft(i)
+					print('posn_ft(%d)=%s'%(i, repr(posn_ft)))
+					print('posn_px(%d)=%s'%(i, repr(_posn_px(i))))
 					velocity_ft = posn_ft - _posn_ft(i - 1) if i != 0 else _posn_ft(i + 1) - posn_ft
 					# compute a vector normal to the direction of travel, pointing right
 					normal_ft = _hat(_vec(velocity_ft[1], velocity_ft[0])) if (velocity_ft[0] != 0 or velocity_ft[1] != 0) else _vec(0, 0)
@@ -210,4 +212,4 @@ class Record:
 	def __str__(self):
 		return "Record '%s' (%d lines)"%(self.name, len(self))
 	def __repr__(self):
-		return 'Record(record_id=%s, name=%s, len=%d'%(self.record_id, self.name, len(self))
+		return 'Record(record_id=%s, name=%s, len=%d)'%(self.record_id, self.name, len(self))
