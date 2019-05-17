@@ -56,12 +56,15 @@ def estop(kill_processor = False, new_process = False):
     
     if pid is not None and _processor_pid() is not None:
         log.critical("Processor.py still hasn't responded. Giving it a few more milliseconds...")
-        time.sleep(0.2)
+        # I'm debating this timeout. 0.65 seconds seems like a looong time to wait in such a
+        # time-critical situation. Then again, the processor's main loop may well take up to
+        # 0.65sec to complete, and the estop has already been engaged, so most likely we can
+        # spare a little over half a second before we break out the big guns with a SIGKILL 
+        time.sleep(0.65)
         if _processor_pid is not None:
             log.critical('Sending SIGKILL to processor - things are about to get ugly.')
             os.kill(pid, signal.SIGKILL)
     if mult_error is not None and spd_ctrl_error is not None:
-        # yes, I know it's bad practice to return exceptions instead
         raise EstopError(mult_error, spd_ctrl_error)
 
 if __name__ == '__main__':
