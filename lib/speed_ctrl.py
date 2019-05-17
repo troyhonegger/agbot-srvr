@@ -24,6 +24,7 @@ class SpeedController:
 	def __enter__(self):
 		"""Equivalent to connect() - implemented to support the with operator"""
 		self.connect()
+		return self
 	def __exit__(self, *args):
 		"""Equivalent to disconnect() - implemented to support the with operator"""
 		self.disconnect()
