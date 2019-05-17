@@ -11,15 +11,15 @@ from lib import speed_ctrl
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(prog = 'keep_alive', description = 'Send KeepAlive messages to the multivator and/or the speed controller')
-	parser.add_argument('-m', '--multivator', action = 'store_true', help = 'Send KeepAlive messages to the multivator')
-	parser.add_argument('-s', '--speed-controller', action = 'store_true', help = 'Send KeepAlive messages to the speed controller')
+	parser.add_argument('-m', '--ignore-multivator', action = 'store_true', help = 'Suppress sending KeepAlive messages to the multivator')
+	parser.add_argument('-s', '--ignore-speed-controller', action = 'store_true', help = 'Suppress sending KeepAlive messages to the speed controller')
 	parser.add_argument('-d', '--delay', type = float, default = 1.0, help = 'Set the delay length in between sending messages')
 
 	args = parser.parse_args()
 
 	log = loghelper.get_logger(__file__)
 
-	if args.multivator:
+	if not args.ignore_multivator:
 		m = multivator.Multivator()
 	else:
 		# passing a dummy class around, with all the methods replaced with no-ops, is easier,
@@ -39,7 +39,7 @@ if __name__ == '__main__':
 			def keep_alive(self):
 				pass
 		m = DummyMultivator()
-	if args.speed_controller:
+	if not args.ignore_speed_controller:
 		s = speed_ctrl.SpeedController()
 	else:
 		class DummySpeedController:
@@ -56,7 +56,6 @@ if __name__ == '__main__':
 			def keep_alive(self):
 				pass
 		s = DummySpeedController()
-	
 	try:
 		while True:
 			try:
