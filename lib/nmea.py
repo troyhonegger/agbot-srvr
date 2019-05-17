@@ -3,6 +3,7 @@
 import pynmea2
 import subprocess
 import datetime
+import sys
 DIR = '/home/agbot/nmea'
 
 # The Trimble supports the following messages:
@@ -110,12 +111,6 @@ if __name__ == '__main__':
 			if not args.ignore_turn:
 				was_turning = None
 				turning_last_edge = None
-			# clear out and discard the first line - it is probably garbage
-			try:
-				for line in nmea_port:
-					break
-			except UnicodeDecodeError:
-				pass
 			for line in nmea_port:
 				try:
 					line = line.strip()
@@ -143,9 +138,11 @@ if __name__ == '__main__':
 					log.error("Invalid NMEA checksum on the following message: '%s'. Skipping this message...", line.strip())
 				except pynmea2.ParseError:
 					log.error("Could not parse NMEA message: '%s'. Skipping this message...", line.strip())
-	except UnicodeDecodeError: # this happens in the serial port's iterator if the baud rate is incorrect
-		log.error("Cannot read NMEA data - baud rate is incorrect. Exiting...")
-		raise
+				except UnicodeDecodeError:
+					# this may happen if the baud rate is wrong, or if the Trimble stops unexpectedly, or if the serial
+					# transmission begins in the middle of a byte, or possibly other issues. If the baud rate is wrong,
+					# this will flood the logs at an alarming rate. Otherwise, the issue can probably be ignored
+					log.warning('Received Unicode decode error - check your baud rate if this message appears repeatedly.')
 	except KeyboardInterrupt:
 		pass # suppress exception, but exit gracefully through finally
 	finally:
