@@ -36,7 +36,7 @@ sigint_received = False
 file = None
 mult = None
 speed_controller = None
-row_state = ROW_STATE_UNSET
+row_state = START_OF_ROW
 
 # TODO: update this as needed to more accurately match our camera layout.
 def map_location(camera_id, x, y):
