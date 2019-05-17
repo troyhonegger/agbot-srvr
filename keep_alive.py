@@ -3,8 +3,6 @@
 import time
 import argparse
 
-import estop
-
 from lib import loghelper
 from lib import multivator
 from lib import speed_ctrl
@@ -64,16 +62,14 @@ if __name__ == '__main__':
 				m.keep_alive()
 			except multivator.MultivatorException as ex:
 				m.disconnect()
-				log.error('Multivator KeepAlive FAILED. Engaging e-stop...')
-				estop.estop(kill_processor = True)
+				log.error('Multivator KeepAlive FAILED.')
 			try:
 				if not s.isconnected():
 					s.connect()
 				s.keep_alive()
 			except speed_ctrl.SpeedControlException as ex:
 				s.disconnect()
-				log.error('SpeedController KeepAlive FAILED. Engaging e-stop...')
-				estop.estop(kill_processor = True)
+				log.error('SpeedController KeepAlive FAILED.')
 			time.sleep(args.delay)
 	finally:
 		m.disconnect()
