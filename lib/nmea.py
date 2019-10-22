@@ -4,6 +4,7 @@ import pynmea2
 import subprocess
 import datetime
 import sys
+import os
 DIR = '/home/agbot/nmea'
 
 # The Trimble supports the following messages:
@@ -70,7 +71,7 @@ def read_data(type):
 		if not os.path.exists(path):
 			raise ValueError('Cannot receive NMEA data because the NMEA listener is not set up. Run %s to start it'%(__file__))
 		_files[type] = open(path, 'r')
-	for line in _files[line]:
+	for line in _files[type]:
 		if len(line) < 2:
 			raise ValueError('No %s data received yet. Make sure the Trimble is working.'%(type))
 		data = pynmea2.parse(line, check = True)

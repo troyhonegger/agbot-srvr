@@ -46,7 +46,7 @@ class MachineState:
 				return repr(ex)
 		elif 'processing' in json_properties and cherrypy.request.json['processing'] == True:
 			if _processor_pid() is None:
-				subprocess.Popen(['/home/agbot/agbot-srvr/processor.py'])
+				subprocess.Popen(['/home/agbot/agbot-srvr/processor.py', '-s'])
 			cherrypy.response.status = '200 OK'
 		elif 'processing' in json_properties and cherrypy.request.json['processing'] == False:
 			pid = _processor_pid()

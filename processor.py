@@ -26,7 +26,7 @@ END_OF_ROW = 3
 TURNING = 4
 
 # TODO: Adjust this to taste
-THRESHOLD = 0.5
+THRESHOLD = 0.15
 
 net = 0
 meta = None
@@ -236,11 +236,13 @@ def stop_processor():
 def sigusr1_handler(sig, frame):
 	global row_state
 	row_state = START_OF_ROW
+	signal.signal(signal.SIGUSR1, sigusr1_handler)
 
 # SIGUSR2 signifies end of row
 def sigusr2_handler(sig, frame):
 	global row_state
 	row_state = END_OF_ROW
+	signal.signal(signal.SIGUSR2, sigusr2_handler)
 
 def sigint_handler(sig, frame):
 	"""Run whenever the process receives a SIGINT signal (either from a user pressing CTRL+C, or from another process).

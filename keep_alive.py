@@ -37,7 +37,8 @@ if __name__ == '__main__':
 			def keep_alive(self):
 				pass
 		m = DummyMultivator()
-	if not args.ignore_speed_controller:
+	#HACK
+	if False:
 		s = speed_ctrl.SpeedController()
 	else:
 		class DummySpeedController:
