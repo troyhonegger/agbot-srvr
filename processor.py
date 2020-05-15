@@ -154,7 +154,7 @@ def process_detector(threshold, ignore_nmea = False, diagcam_id = None):
 	if not ignore_nmea:
 		gga = nmea.read_data(nmea.GGA)
 		record = records.RecordLine(datetime.datetime.now(), gga.longitude, gga.latitude, results)
-		print(str(record), file)
+		print(str(record), file=file)
 
 def process_rowctrl():
 	global row_state
